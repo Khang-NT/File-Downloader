@@ -1,9 +1,37 @@
+plugins {
+    id "com.jfrog.bintray" version "1.7"
+}
+
 apply plugin: 'java'
-apply plugin: 'me.tatarka.retrolambda'
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
 }
 
-sourceCompatibility = "1.8"
-targetCompatibility = "1.8"
+sourceCompatibility = "1.6"
+targetCompatibility = "1.6"
+
+Properties properties = new Properties()
+properties.load(project.rootProject.file('local.properties').newDataInputStream())
+def bintrayUser = properties.getProperty('bintrayUser')
+def bintrayApiKey = properties.getProperty('bintrayApiKey')
+
+group = 'com.github.khangnt'
+version = '0.1'
+
+bintray {
+    user = project.hasProperty('bintrayUser') ? bintrayUser : System.getenv('BINTRAY_USER')
+    key = project.hasProperty('bintrayApiKey') ? bintrayApiKey : System.getenv('BINTRAY_API_KEY')
+    configurations = ['archives']
+    pkg {
+        repo = 'maven'
+        name = 'Java-File-Downloader'
+        userOrg = user
+        licenses = ['Apache-2.0']
+        vcsUrl = 'https://github.com/Khang-NT/File-Downloader.git'
+        version {
+            name = version
+            vcsTag = "release-v${version}"
+        }
+    }
+}
