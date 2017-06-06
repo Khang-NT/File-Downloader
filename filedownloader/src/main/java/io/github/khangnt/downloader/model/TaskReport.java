@@ -1,5 +1,6 @@
 package io.github.khangnt.downloader.model;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -13,7 +14,7 @@ public class TaskReport {
 
     public TaskReport(Task task, List<ChunkReport> chunkReports) {
         this.mTask = task;
-        this.mChunkReports = chunkReports;
+        this.mChunkReports = Collections.unmodifiableList(chunkReports);
     }
 
     public Task getTask() {

@@ -1,8 +1,11 @@
 package io.github.khangnt.downloader;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.Executor;
 
 import io.github.khangnt.downloader.model.Task;
+import io.github.khangnt.downloader.model.TaskReport;
 
 /**
  * Created by Khang NT on 6/3/17.
@@ -29,6 +32,9 @@ public interface IFileDownloader {
     void unregisterListener(EventListener listener);
 
     long getSpeed();
+
+    TaskReport getTaskReport(Task task);
+    List<TaskReport> getTaskReports(Collection<Task> tasks);
 
     TaskManager getTaskManager();
     HttpClient getHttpClient();
