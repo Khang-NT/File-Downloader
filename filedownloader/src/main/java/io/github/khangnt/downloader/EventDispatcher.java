@@ -105,20 +105,6 @@ class EventDispatcher implements EventListener {
     }
 
     @Override
-    public void onQueueUpdated(final List<TaskReport> queue) {
-        synchronized (mListenerList) {
-            for (final ListenerWrapper listenerWrapper : mListenerList) {
-                listenerWrapper.mExecutor.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        listenerWrapper.mListener.onQueueUpdated(queue);
-                    }
-                });
-            }
-        }
-    }
-
-    @Override
     public void onResumed() {
         synchronized (mListenerList) {
             for (final ListenerWrapper listenerWrapper : mListenerList) {
