@@ -22,11 +22,9 @@ public interface TaskManager {
 
     Chunk insertChunk(Chunk chunk);
     Chunk updateChunk(Chunk chunk);
-    void removeChunk(int chunkId);
-    Chunk findChunk(int chunkId);
 
-    List<Task> getUnfinishedTasks();
-    List<Task> getFinishedTasks();
+    List<Task> getUndoneTasks();
+    List<Task> getDoneTasks();
 
     void cleanUpFinishedTasks();
 

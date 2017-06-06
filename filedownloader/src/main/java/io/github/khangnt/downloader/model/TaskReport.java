@@ -33,7 +33,7 @@ public class TaskReport {
             case MERGING:
                 return 100;
             case DOWNLOADING:
-            case PENDING:
+            case WAITING:
             default:
                 if (mTask.isResumable()) {
                     return calculateDownloadedLength() * 100f / mTask.getLength();
@@ -49,5 +49,24 @@ public class TaskReport {
         for (ChunkReport chunkReport : mChunkReports)
             length += chunkReport.getDownloadedLength();
         return length;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        TaskReport that = (TaskReport) o;
+
+        if (!mTask.equals(that.mTask)) return false;
+        return mChunkReports.equals(that.mChunkReports);
+
+    }
+
+    @Override
+    public int hashCode() {
+        int result = mTask.hashCode();
+        result = 31 * result + mChunkReports.hashCode();
+        return result;
     }
 }

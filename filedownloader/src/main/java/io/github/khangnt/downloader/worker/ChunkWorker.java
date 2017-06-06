@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
+import io.github.khangnt.downloader.C;
 import io.github.khangnt.downloader.DownloadSpeedMeter;
 import io.github.khangnt.downloader.FileManager;
 import io.github.khangnt.downloader.HttpClient;
@@ -79,7 +80,7 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
                 throw new IllegalStateException("Can't split chunk not resumable");
             long remainingBytes = getRemainingBytes();
             Log.d("Chunk length: %d, remaining bytes: %d", mChunk.getLength(), remainingBytes);
-            if (remainingBytes >= Chunk.MIN_CHUNK_LENGTH * 4) {
+            if (remainingBytes >= C.MIN_CHUNK_LENGTH * 4) {
                 long splitPoint = mChunk.getEnd() - remainingBytes / 2;
                 Chunk.Builder newChunkBuilder = new Chunk.Builder(mChunk.getTaskId())
                         .setRange(splitPoint + 1, mChunk.getEnd());
@@ -102,9 +103,15 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
         int retryTime = 0;
         while (retryTime < MAX_RETRY) {
             try {
-                execute();
+                long downloaded = execute();
                 // download successful
-                mTaskManager.updateChunk(mChunk.newBuilder().setFinished(true).build());
+                Chunk.Builder builder = mChunk.newBuilder();
+                builder.setFinished(true);
+                if (!builder.isResumable()) {
+                    // chunk is finished, update the range if it is unknown
+                    builder.setRange(0, downloaded - 1);
+                }
+                mTaskManager.updateChunk(mChunk = builder.build());
                 onChunkFinished(this);
                 return;
             } catch (InterruptedException ex) {
@@ -119,7 +126,7 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
         onChunkError(this, "Exceed max retry: " + lastException.getMessage(), lastException);
     }
 
-    private void execute() throws Exception {
+    private long execute() throws Exception {
         long downloaded;
         String range;
         synchronized (lock) {
@@ -129,7 +136,7 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
                 downloaded = 0;
             } else if (mChunk.isResumable() && downloaded >= mChunk.getLength()) {
                 // download completed
-                return;
+                return downloaded;
             }
 
             range = null;
@@ -144,6 +151,7 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
         try {
             downloaded = download(os, is, downloaded);
             Log.d("Chunk-%d: %d/%d", mChunk.getId(), downloaded, mChunk.getLength());
+            return downloaded;
         } finally {
             try {
                 os.close();

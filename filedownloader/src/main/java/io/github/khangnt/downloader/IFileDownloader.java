@@ -14,7 +14,9 @@ public interface IFileDownloader {
     void start();
     void pause();
     void release();
+
     boolean isRunning();
+    boolean isReleased();
 
     Task addTask(Task task);
     void cancelTask(int taskId);

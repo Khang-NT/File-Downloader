@@ -22,12 +22,17 @@ public class DefaultHttpClient implements HttpClient {
     }
 
     @Override
-    public long fetchContentLength(Task task) throws IOException {
+    public long fetchContentLength(Task task) {
         Map<String, String> headers = new HashMap<>();
         headers.put("Range", "bytes=0-");
-        HttpURLConnection connection = openConnection(task.getUrl(), headers, "GET");
-        long length = connection.getContentLengthLong();
-        return length == -1 ? Task.UNKNOWN_LENGTH : length;
+        try {
+            HttpURLConnection connection = openConnection(task.getUrl(), headers, "HEAD");
+            long length = connection.getContentLengthLong();
+            return length == -1 ? C.UNKNOWN_LENGTH : length;
+        } catch (IOException ex) {
+            Log.d("Can't get content length of task-%d", task.getId());
+            return C.UNKNOWN_LENGTH;
+        }
     }
 
     private HttpURLConnection openConnection(String urlStr, Map<String, String> headers,

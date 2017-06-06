@@ -11,21 +11,22 @@ import java.util.concurrent.ThreadFactory;
  */
 
 public class ModeratorExecutor implements Executor, Runnable {
-    private final BlockingQueue<Runnable> runnableBlockingQueue = new LinkedBlockingQueue<>();
+    private BlockingQueue<Runnable> mRunnableBlockingQueue;
     private ThreadFactory mThreadFactory;
-    private Thread moderatorThread;
+    private Thread mModeratorThread;
 
     public ModeratorExecutor(ThreadFactory threadFactory) {
         mThreadFactory = threadFactory;
+        mRunnableBlockingQueue = new LinkedBlockingQueue<>();
     }
 
     @Override
     public void execute(Runnable runnable) {
         synchronized (this) {
-            runnableBlockingQueue.offer(runnable);
-            if (moderatorThread == null) {
-                moderatorThread = mThreadFactory.newThread(this);
-                moderatorThread.start();
+            mRunnableBlockingQueue.offer(runnable);
+            if (mModeratorThread == null) {
+                mModeratorThread = mThreadFactory.newThread(this);
+                mModeratorThread.start();
             }
             notify();
         }
@@ -33,29 +34,29 @@ public class ModeratorExecutor implements Executor, Runnable {
 
     @Override
     public void run() {
-        while (!Thread.interrupted()) {
+        while (true) {
             synchronized (this) {
-                if (runnableBlockingQueue.peek() == null) try {
+                if (mRunnableBlockingQueue.peek() == null) try {
                     wait();
                 } catch (InterruptedException e) {
                     break;
                 }
             }
-            Runnable runnable = runnableBlockingQueue.poll();
+            Runnable runnable = mRunnableBlockingQueue.poll();
             if (runnable != null) runnable.run();
         }
     }
 
-    public void interrupt() {
-        synchronized (runnableBlockingQueue) {
-            if (moderatorThread != null) {
-                moderatorThread.interrupt();
+    public void executeAllPendingRunnable() {
+        synchronized (this) {
+            if (mModeratorThread != null) {
+                mModeratorThread.interrupt();
                 try {
-                    moderatorThread.join();
+                    mModeratorThread.join();
                 } catch (InterruptedException ignore) {
                 }
             }
-            moderatorThread = null;
+            mModeratorThread = null;
         }
     }
 }

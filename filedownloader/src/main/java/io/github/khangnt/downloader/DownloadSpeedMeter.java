@@ -14,7 +14,6 @@ public class DownloadSpeedMeter {
     private final long[] bucket = new long[]{0, 0, 0, 0};
     private Timer mTimer;
     private int i = 0;
-    private boolean paused = true;
 
     public void start() {
         synchronized (bucket) {
@@ -30,7 +29,6 @@ public class DownloadSpeedMeter {
                     update();
                 }
             }, INTERVAL, INTERVAL);
-            paused = false;
         }
     }
 
@@ -41,12 +39,7 @@ public class DownloadSpeedMeter {
                 mTimer.purge();
             }
             mTimer = null;
-            paused = true;
         }
-    }
-
-    public void release() {
-        pause();
     }
 
     public void onBytesDownloaded(long count) {

@@ -1,5 +1,7 @@
 package io.github.khangnt.downloader.model;
 
+import static io.github.khangnt.downloader.C.DEFAULT_MAX_PARALLEL_CONNECTIONS;
+import static io.github.khangnt.downloader.C.UNSET;
 import static io.github.khangnt.downloader.util.Utils.isEmpty;
 
 /**
@@ -12,14 +14,12 @@ public class Task {
     public enum State {
         IDLE,
         DOWNLOADING,
-        PENDING,
+        WAITING,
         MERGING,
         FAILED,
         FINISHED;
     }
 
-    public static final int UNSET = -1;
-    public static final int UNKNOWN_LENGTH = 0;
 
     private int mId = UNSET;
     private String mUrl;
@@ -28,7 +28,7 @@ public class Task {
     private String mDeveloperPayload;
     private State mState = State.IDLE;
     private String message;
-    private int mMaxChunks = 8;
+    private int mMaxParallelConnections = DEFAULT_MAX_PARALLEL_CONNECTIONS;
 
     private Task() {}
 
@@ -64,8 +64,8 @@ public class Task {
         return message;
     }
 
-    public int getMaxChunks() {
-        return mMaxChunks;
+    public int getMaxParallelConnections() {
+        return mMaxParallelConnections;
     }
 
     public Builder newBuilder() {
@@ -75,7 +75,28 @@ public class Task {
                 .setLength(getLength())
                 .setMessage(getMessage())
                 .setState(getState())
-                .setMaxChunks(getMaxChunks());
+                .setMaxParallelConnections(getMaxParallelConnections());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Task task = (Task) o;
+
+        if (mId != task.mId) return false;
+        if (!mUrl.equals(task.mUrl)) return false;
+        return mFilePath.equals(task.mFilePath);
+
+    }
+
+    @Override
+    public int hashCode() {
+        int result = mId;
+        result = 31 * result + mUrl.hashCode();
+        result = 31 * result + mFilePath.hashCode();
+        return result;
     }
 
     public static class Builder {
@@ -113,9 +134,9 @@ public class Task {
             return this;
         }
 
-        public Builder setMaxChunks(int n) {
+        public Builder setMaxParallelConnections(int n) {
             if (n <= 0) throw new IllegalArgumentException("Max chunk can't < 0");
-            mTask.mMaxChunks = n;
+            mTask.mMaxParallelConnections = n;
             return this;
         }
 
@@ -152,7 +173,7 @@ public class Task {
         }
 
         public int getMaxChunks() {
-            return mTask.mMaxChunks;
+            return mTask.mMaxParallelConnections;
         }
 
         public Task build() {

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 
-import io.github.khangnt.downloader.model.Task;
 import io.github.khangnt.downloader.model.TaskReport;
 
 /**
@@ -14,7 +13,7 @@ import io.github.khangnt.downloader.model.TaskReport;
 
 class EventDispatcher implements EventListener {
 
-    private final List<ListenerWrapper> mListenerList = new ArrayList<>();
+    private final List<ListenerWrapper> mListenerList = new ArrayList<ListenerWrapper>();
 
     public void registerListener(Executor executor, EventListener listener) {
         synchronized (mListenerList) {
@@ -34,38 +33,87 @@ class EventDispatcher implements EventListener {
         }
     }
 
+
     @Override
-    public void onTaskAdded(Task task) {
+    public void onTaskAdded(final TaskReport taskReport) {
         synchronized (mListenerList) {
-            for (ListenerWrapper listenerWrapper : mListenerList) {
-                listenerWrapper.mExecutor.execute(() -> listenerWrapper.mListener.onTaskAdded(task));
+            for (final ListenerWrapper listenerWrapper : mListenerList) {
+                listenerWrapper.mExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        listenerWrapper.mListener.onTaskAdded(taskReport);
+                    }
+                });
             }
         }
     }
 
     @Override
-    public void onTaskRemoved(Task task) {
+    public void onTaskUpdated(final TaskReport taskReport) {
         synchronized (mListenerList) {
-            for (ListenerWrapper listenerWrapper : mListenerList) {
-                listenerWrapper.mExecutor.execute(() -> listenerWrapper.mListener.onTaskRemoved(task));
+            for (final ListenerWrapper listenerWrapper : mListenerList) {
+                listenerWrapper.mExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        listenerWrapper.mListener.onTaskUpdated(taskReport);
+                    }
+                });
             }
         }
     }
 
     @Override
-    public void onTaskFinished(Task task) {
+    public void onTaskCancelled(final TaskReport taskReport) {
         synchronized (mListenerList) {
-            for (ListenerWrapper listenerWrapper : mListenerList) {
-                listenerWrapper.mExecutor.execute(() -> listenerWrapper.mListener.onTaskFinished(task));
+            for (final ListenerWrapper listenerWrapper : mListenerList) {
+                listenerWrapper.mExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        listenerWrapper.mListener.onTaskCancelled(taskReport);
+                    }
+                });
             }
         }
     }
 
     @Override
-    public void onQueueChanged(List<TaskReport> queue) {
+    public void onTaskFinished(final TaskReport taskReport) {
         synchronized (mListenerList) {
-            for (ListenerWrapper listenerWrapper : mListenerList) {
-                listenerWrapper.mExecutor.execute(() -> listenerWrapper.mListener.onQueueChanged(queue));
+            for (final ListenerWrapper listenerWrapper : mListenerList) {
+                listenerWrapper.mExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        listenerWrapper.mListener.onTaskFinished(taskReport);
+                    }
+                });
+            }
+        }
+    }
+
+    @Override
+    public void onTaskFailed(final TaskReport taskReport) {
+        synchronized (mListenerList) {
+            for (final ListenerWrapper listenerWrapper : mListenerList) {
+                listenerWrapper.mExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        listenerWrapper.mListener.onTaskFailed(taskReport);
+                    }
+                });
+            }
+        }
+    }
+
+    @Override
+    public void onQueueUpdated(final List<TaskReport> queue) {
+        synchronized (mListenerList) {
+            for (final ListenerWrapper listenerWrapper : mListenerList) {
+                listenerWrapper.mExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        listenerWrapper.mListener.onQueueUpdated(queue);
+                    }
+                });
             }
         }
     }
@@ -73,8 +121,13 @@ class EventDispatcher implements EventListener {
     @Override
     public void onResumed() {
         synchronized (mListenerList) {
-            for (ListenerWrapper listenerWrapper : mListenerList) {
-                listenerWrapper.mExecutor.execute(() -> listenerWrapper.mListener.onResumed());
+            for (final ListenerWrapper listenerWrapper : mListenerList) {
+                listenerWrapper.mExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        listenerWrapper.mListener.onResumed();
+                    }
+                });
             }
         }
     }
@@ -82,8 +135,13 @@ class EventDispatcher implements EventListener {
     @Override
     public void onPaused() {
         synchronized (mListenerList) {
-            for (ListenerWrapper listenerWrapper : mListenerList) {
-                listenerWrapper.mExecutor.execute(() -> listenerWrapper.mListener.onPaused());
+            for (final ListenerWrapper listenerWrapper : mListenerList) {
+                listenerWrapper.mExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        listenerWrapper.mListener.onPaused();
+                    }
+                });
             }
         }
     }
