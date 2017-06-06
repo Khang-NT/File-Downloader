@@ -1,10 +1,8 @@
 import java.util.regex.Pattern
 
-plugins {
-    id "com.jfrog.bintray" version "1.7"
-}
-
 apply plugin: 'java'
+apply plugin: 'com.jfrog.bintray'
+apply plugin: 'maven-publish'
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
@@ -15,6 +13,47 @@ targetCompatibility = "1.7"
 
 group = 'com.github.khangnt'
 version = project.hasProperty('releaseTag') ? releaseTag.replaceAll('release-v', '') : ''
+
+def pomConfig = {
+    licenses {
+        license {
+            name "The Apache Software License, Version 2.0"
+            url "http://www.apache.org/licenses/LICENSE-2.0.txt"
+            distribution "repo"
+        }
+    }
+    developers {
+        developer {
+            id "khang-nt"
+            name "Khang-NT"
+            email "vn.khangnt@gmail.com"
+        }
+    }
+
+    scm {
+        url "https://github.com/Khang-NT/File-Downloader"
+    }
+}
+
+publishing {
+    publications {
+        Publication(MavenPublication) {
+            from components.java
+            artifact sourceJar
+            artifact javaDocJar
+            groupId group
+            artifactId 'file-downloader'
+            version project.version
+            pom.withXml {
+                def root = asNode()
+                root.appendNode('description', 'A File-Downloader library for Android and Java applications.')
+                root.appendNode('name', 'File Downloader')
+                root.appendNode('url', 'https://github.com/Khang-NT/File-Downloader')
+                root.children().last() + pomConfig
+            }
+        }
+    }
+}
 
 bintrayUpload {}.doFirst {
     Pattern pattern = Pattern.compile("^(\\d+)(\\.\\d+)+\$")
@@ -35,7 +74,8 @@ bintray {
     }
     user = bintrayUser != null ? bintrayUser : System.getenv('BINTRAY_USER')
     key = bintrayApiKey != null ? bintrayApiKey : System.getenv('BINTRAY_API_KEY')
-    configurations = ['archives']
+    publish = true
+    publications = ['Publication']
     pkg {
         repo = 'maven'
         name = 'Java-File-Downloader'
@@ -45,6 +85,29 @@ bintray {
         version {
             name = project.version
             vcsTag = "release-v$project.version"
+            released  = new Date()
         }
     }
+}
+
+task sourceJar(type: Jar) {
+    from sourceSets.main.java.srcDirs
+    classifier 'sources'
+}
+
+task generateJavaDoc(type: Javadoc) {
+    source = sourceSets.main.java.srcDirs
+    destinationDir = file("../javadoc/")
+    failOnError false
+}
+
+task javaDocJar(type: Jar) {
+    from javadoc.destinationDir
+    classifier 'javadoc'
+    dependsOn generateJavaDoc
+}
+
+artifacts {
+    archives sourceJar
+    archives javaDocJar
 }

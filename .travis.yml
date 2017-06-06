@@ -16,4 +16,4 @@ install: echo "Skip"
 script:
   - ./gradlew clean build test
 after_success:
-  - if [[ $TRAVIS_TAG =~ "^release-v[[:digit:]]+(\\.[[:digit:]]+)+$" ]] then ./gradlew bintrayUpload -PreleaseTag=$TRAVIS_TAG; fi;
+  - bash publish.sh
