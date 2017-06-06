@@ -1,20 +1,19 @@
 package io.github.khangnt.downloader.model;
 
+import static io.github.khangnt.downloader.C.UNSET;
+
 /**
  * Created by Khang NT on 6/2/17.
  * Email: khang.neon.1997@gmail.com
  */
 public class Chunk {
-    public static final int UNSET = -1;
-    public static final int NO_WHERE = -1;
-    public static final long MIN_CHUNK_LENGTH = 250 * 1024L; // 250KB
 
     private int mId = UNSET;
     private int mTaskId;
-    private boolean finished = false;
+    private boolean mFinished = false;
     private boolean mResumable = false;
-    private long mBegin = NO_WHERE;
-    private long mEnd = NO_WHERE;
+    private long mBegin = UNSET;
+    private long mEnd = UNSET;
 
     private Chunk() {}
 
@@ -44,7 +43,7 @@ public class Chunk {
     }
 
     public boolean isFinished() {
-        return finished;
+        return mFinished;
     }
 
     public Builder newBuilder() {
@@ -52,6 +51,25 @@ public class Chunk {
                 .setId(getId())
                 .setRange(getBegin(), getEnd())
                 .setFinished(isFinished());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Chunk chunk = (Chunk) o;
+
+        if (mId != chunk.mId) return false;
+        return mTaskId == chunk.mTaskId;
+
+    }
+
+    @Override
+    public int hashCode() {
+        int result = mId;
+        result = 31 * result + mTaskId;
+        return result;
     }
 
     public static class Builder {
@@ -67,14 +85,12 @@ public class Chunk {
         }
 
         public Builder setRange(long begin, long end) {
-            if (begin == NO_WHERE || end == NO_WHERE) {
-                mChunk.mBegin = mChunk.mEnd = NO_WHERE;
+            if (begin == UNSET || end == UNSET) {
+                mChunk.mBegin = mChunk.mEnd = UNSET;
                 mChunk.mResumable = false;
                 return this;
-            } else if (end < begin) {
+            } else if (end < begin || end < 0) {
                 throw new IllegalArgumentException("Invalid range " + begin + ".." + end);
-            } else if (end - begin + 1 < MIN_CHUNK_LENGTH) {
-                throw new IllegalArgumentException("Chunk size too small");
             }
             mChunk.mBegin = begin;
             mChunk.mEnd = end;
@@ -83,8 +99,37 @@ public class Chunk {
         }
 
         public Builder setFinished(boolean finished) {
-            mChunk.finished = finished;
+            mChunk.mFinished = finished;
             return this;
+        }
+
+        public int getId() {
+            return mChunk.mId;
+        }
+
+        public int getTaskId() {
+            return mChunk.mTaskId;
+        }
+
+        public boolean isResumable() {
+            return mChunk.mResumable;
+        }
+
+        public long getBegin() {
+            return mChunk.mBegin;
+        }
+
+        public long getEnd() {
+            return mChunk.mEnd;
+        }
+
+        public long getLength() {
+            if (isResumable()) return getEnd() - getBegin() + 1;
+            return 0;
+        }
+
+        public boolean isFinished() {
+            return mChunk.mFinished;
         }
 
         public Chunk build() {

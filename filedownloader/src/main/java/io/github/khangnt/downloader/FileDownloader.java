@@ -1,12 +1,13 @@
 package io.github.khangnt.downloader;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
 
 import io.github.khangnt.downloader.exception.TaskNotFoundException;
 import io.github.khangnt.downloader.model.Chunk;
@@ -43,23 +44,27 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
 
     private int mMaxWorker;
 
-    public FileDownloader(FileManager fileManager, HttpClient httpClient, TaskManager taskManager,
-                          DownloadSpeedMeter downloadSpeedMeter) {
+    public FileDownloader(FileManager fileManager, HttpClient httpClient, TaskManager taskManager) {
         mFileManager = fileManager;
         mHttpClient = httpClient;
         mTaskManager = taskManager;
-        mDownloadSpeedMeter = downloadSpeedMeter;
 
         mRunning = false;
         mEventDispatcher = new EventDispatcher();
+        mDownloadSpeedMeter = new DownloadSpeedMeter();
         mWorkers = new HashMap<>();
-        mModeratorExecutor = new ModeratorExecutor(runnable -> new Thread(runnable, MODERATOR_THREAD));
+        mModeratorExecutor = new ModeratorExecutor(new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable runnable) {
+                return new Thread(runnable, MODERATOR_THREAD);
+            }
+        });
     }
 
     @Override
     public Task addTask(Task task) {
         Task result = getTaskManager().insertTask(task);
-        if (isRunning()) mModeratorExecutor.execute(this::spawnWorker);
+        if (isRunning()) spawnWorker();
         return result;
     }
 
@@ -76,7 +81,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     public void start() {
         synchronized (lock) {
             mRunning = true;
-            mModeratorExecutor.execute(this::spawnWorker);
+            spawnWorker();
             mDownloadSpeedMeter.start();
         }
     }
@@ -84,37 +89,41 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     @Override
     public void pause() {
         synchronized (lock) {
-            mDownloadSpeedMeter.pause();
-            mModeratorExecutor.execute(() -> {
-                for (Map.Entry<String, Thread> entry : mWorkers.entrySet()) {
-                    entry.getValue().interrupt();
-                }
-                mWorkers.clear();
-            });
-            mModeratorExecutor.interrupt();
             mRunning = false;
+            mDownloadSpeedMeter.pause();
+            mModeratorExecutor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    for (Thread thread : mWorkers.values()) {
+                        thread.interrupt();
+                    }
+                    mWorkers.clear();
+                }
+            });
         }
     }
 
     @Override
     public void release() {
-        pause();
         synchronized (lock) {
+            pause();
+            mModeratorExecutor.executeAllPendingRunnable();
             mEventDispatcher.unregisterAllListener();
             mTaskManager.release();
-            mDownloadSpeedMeter.release();
             mFileManager = null;
             mHttpClient = null;
             mTaskManager = null;
-            mDownloadSpeedMeter = null;
-            mEventDispatcher = null;
-            mModeratorExecutor = null;
         }
     }
 
     @Override
     public boolean isRunning() {
         return mRunning;
+    }
+
+    @Override
+    public boolean isReleased() {
+        return getFileManager() == null || getTaskManager() == null || getHttpClient() == null;
     }
 
     @Override
@@ -130,7 +139,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                     throw new IllegalArgumentException("Number of workers must > 0");
                 mMaxWorker = maxWorkers;
             }
-            if (mRunning) mModeratorExecutor.execute(this::spawnWorker);
+            if (mRunning) spawnWorker();
         }
     }
 
@@ -169,40 +178,46 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
         return mFileManager;
     }
 
-    void spawnWorker() {
-        if (!Thread.currentThread().getName().equals(MODERATOR_THREAD))
-            throw new IllegalStateException("Spawn worker must run on Moderator thread");
-        List<Task> unfinishedTasks = getTaskManager().getUnfinishedTasks();
-        for (Task task : unfinishedTasks) {
-            if (!isRunning() || Thread.interrupted()) return;
-            if (task.getState() == Task.State.IDLE) try {
-                task = initTask(task);
-            } catch (Exception e) {
-                Log.e(e, "Failed to get content length");
-                // INIT -> FAILED
-                getTaskManager().updateTask(task.newBuilder().setState(Task.State.FAILED)
-                        .setMessage("Failed to read content length: " + e.getMessage())
-                        .build());
-            }
-            if (mWorkers.size() < getMaxWorkers()) {
-                List<Chunk> chunks = mTaskManager.getChunksOfTask(task);
-                if (areAllChunkFinished(chunks)) {
-                    getTaskManager().updateTask(task.newBuilder().setState(Task.State.MERGING)
-                            .build());
-                    spawnMergeFileWorkerIfNotExists(task, chunks);
-                } else {
-                    spawnChunkWorkerIfNotExists(task, chunks);
-                    splitLargeChunkIfPossible(task);
+    protected void spawnWorker() {
+        mModeratorExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                if (!Thread.currentThread().getName().equals(MODERATOR_THREAD))
+                    throw new IllegalStateException("Spawn worker must run on Moderator thread");
+                if (!isRunning() || Thread.interrupted()) return;
+                List<Task> unfinishedTasks = getTaskManager().getUndoneTasks();
+                for (Task task : unfinishedTasks) {
+                    if (!isRunning() || Thread.interrupted()) return;
+                    if (task.getState() == Task.State.IDLE) try {
+                        task = initTask(task);
+                    } catch (Exception e) {
+                        Log.e(e, "Failed to initialize task-%d", task.getId());
+                        // INIT -> FAILED
+                        getTaskManager().updateTask(task.newBuilder().setState(Task.State.FAILED)
+                                .setMessage("Failed to read content length: " + e.getMessage())
+                                .build());
+                    }
+                    if (mWorkers.size() < getMaxWorkers()) {
+                        List<Chunk> chunks = mTaskManager.getChunksOfTask(task);
+                        if (areAllChunkFinished(chunks)) {
+                            getTaskManager().updateTask(task.newBuilder().setState(Task.State.MERGING)
+                                    .build());
+                            spawnMergeFileWorkerIfNotExists(task, chunks);
+                        } else {
+                            spawnChunkWorkerIfNotExists(task, chunks);
+                            splitLargeChunkIfPossible(task);
+                        }
+                    }
                 }
             }
-        }
+        });
     }
 
-    protected Task initTask(Task task) throws IOException {
+    protected Task initTask(Task task) {
         Log.d("Initializing task-%d...", task.getId());
         mTaskManager.removeChunksOfTask(task);
         Task.Builder after = task.newBuilder();
-        if (after.getLength() == Task.UNSET)
+        if (after.getLength() == C.UNSET)
             after.setLength(getHttpClient().fetchContentLength(task));
         if (!after.isResumable()) {
             getTaskManager().insertChunk(new Chunk.Builder(after.getId()).build());
@@ -210,7 +225,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
             long length = after.getLength();
             int numberOfChunks = 1;
             while (numberOfChunks < after.getMaxChunks()
-                    && length / (numberOfChunks + 1) > Chunk.MIN_CHUNK_LENGTH)
+                    && length / (numberOfChunks + 1) > C.MIN_CHUNK_LENGTH)
                 numberOfChunks++;
             final long lengthPerChunk = length / numberOfChunks;
             for (int i = 0; i < numberOfChunks - 1; i++) {
@@ -222,8 +237,8 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                     .setRange((numberOfChunks - 1) * lengthPerChunk, length - 1)
                     .build());
         }
-        // INIT -> PENDING
-        return mTaskManager.updateTask(after.setState(Task.State.PENDING).build());
+        // INIT -> WAITING
+        return mTaskManager.updateTask(after.setState(Task.State.WAITING).build());
     }
 
     protected void spawnChunkWorkerIfNotExists(Task task, List<Chunk> chunks) {
@@ -258,7 +273,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
 
     protected void splitLargeChunkIfPossible(Task task) {
         if (!task.isResumable()) return;
-        List<ChunkWorker> runningChunks = new ArrayList<>();
+        List<ChunkWorker> runningChunks = new ArrayList<ChunkWorker>();
         for (Thread thread : mWorkers.values()) {
             if (thread instanceof ChunkWorker) {
                 ChunkWorker worker = (ChunkWorker) thread;
@@ -266,17 +281,21 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                     runningChunks.add(worker);
             }
         }
-        int maxChunksCanSpawn = Math.min(getMaxWorkers() - mWorkers.size(),
-                task.getMaxChunks() - runningChunks.size());
-        if (maxChunksCanSpawn > 0) {
-            // sort by remaining bytes of chunk
-            Collections.sort(runningChunks, (c1, c2) -> -Long.compare(c1.getRemainingBytes(),
-                    c2.getRemainingBytes()));
+        int maxWorkersCanSpawn = Math.min(getMaxWorkers() - mWorkers.size(),
+                task.getMaxParallelConnections() - runningChunks.size());
+        if (maxWorkersCanSpawn > 0) {
+            // sort running chunk workers by remaining bytes of chunk
+            Collections.sort(runningChunks, new Comparator<ChunkWorker>() {
+                @Override
+                public int compare(ChunkWorker c1, ChunkWorker c2) {
+                    return - Long.compare(c1.getRemainingBytes(), c2.getRemainingBytes());
+                }
+            });
             for (ChunkWorker worker : runningChunks) {
                 Chunk newChunk = worker.splitChunk();
                 if (newChunk == null) return;
                 spawnChunkWorkerIfNotExists(task, Collections.singletonList(newChunk));
-                if (--maxChunksCanSpawn == 0) return;
+                if (--maxWorkersCanSpawn == 0) return;
             }
         }
     }
@@ -288,33 +307,41 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
         return true;
     }
 
-    private void cancelTaskInternal(Task task, String message) {
+    private void cancelTaskInternal(final Task task, String message) {
         getTaskManager().updateTask(task.newBuilder().setState(Task.State.FAILED)
                 .setMessage(message)
                 .build());
-        mModeratorExecutor.execute(() -> {
-            List<Chunk> chunksOfTask = getTaskManager().getChunksOfTask(task);
-            for (Chunk chunk : chunksOfTask) {
-                ChunkWorker worker = (ChunkWorker) mWorkers.remove(CHUNK_KEY_PREFIX + chunk.getId());
-                if (worker != null) {
-                    worker.interrupt();
-                    try {
-                        worker.join();
-                    } catch (InterruptedException e) {
+        mModeratorExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                List<Chunk> chunksOfTask = getTaskManager().getChunksOfTask(task);
+                for (Chunk chunk : chunksOfTask) {
+                    ChunkWorker worker = (ChunkWorker) mWorkers.remove(CHUNK_KEY_PREFIX + chunk.getId());
+                    if (worker != null) {
+                        worker.interrupt();
+                        try {
+                            worker.join();
+                        } catch (InterruptedException ignore) {
+                        }
+                        String chunkFile = getFileManager().getChunkFile(task, chunk.getId());
+                        getFileManager().deleteFile(chunkFile);
                     }
-                    String chunkFile = getFileManager().getChunkFile(task, chunk.getId());
-                    getFileManager().deleteFile(chunkFile);
                 }
             }
         });
     }
 
     @Override
-    public void onChunkFinished(ChunkWorker worker) {
+    public void onChunkFinished(final ChunkWorker worker) {
         Log.d("Chunk-%d finished", worker.getChunk().getId());
-        mModeratorExecutor.execute(() -> mWorkers.remove(CHUNK_KEY_PREFIX + worker.getChunk().getId()));
+        mModeratorExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                mWorkers.remove(CHUNK_KEY_PREFIX + worker.getChunk().getId());
+            }
+        });
         synchronized (lock) {
-            if (isRunning()) mModeratorExecutor.execute(this::spawnWorker);
+            if (isRunning()) spawnWorker();
         }
     }
 
@@ -322,54 +349,78 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     public void onChunkError(ChunkWorker worker, String reason, Throwable throwable) {
         Log.e(throwable, "Chunk-%d failed: %s", worker.getChunk().getId(), reason);
         // download chunk error ==> the task also error
-        Task task = getTaskManager().findTask(worker.getChunk().getTaskId());
-        if (task == null)
-            throw new TaskNotFoundException("Something went wrong, task was removed while chunks were downloading");
-        cancelTaskInternal(task, reason);
         synchronized (lock) {
-            if (isRunning()) mModeratorExecutor.execute(this::spawnWorker);
+            if (isRunning()) {
+                spawnWorker();
+            }
+            if (!isReleased()) {
+                Task task = getTaskManager().findTask(worker.getChunk().getTaskId());
+                if (task == null)
+                    throw new TaskNotFoundException("Something went wrong, task was removed while chunks were downloading");
+                cancelTaskInternal(task, reason);
+            }
         }
     }
 
     @Override
-    public void onChunkInterrupted(ChunkWorker worker) {
-        mModeratorExecutor.execute(() -> mWorkers.remove(CHUNK_KEY_PREFIX + worker.getChunk().getId()));
+    public void onChunkInterrupted(final ChunkWorker worker) {
+        mModeratorExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                mWorkers.remove(CHUNK_KEY_PREFIX + worker.getChunk().getId());
+            }
+        });
         Log.d("Chunk-%d is interrupted", worker.getChunk().getId());
     }
 
     @Override
-    public void onMergeFileFinished(MergeFileWorker worker) {
+    public void onMergeFileFinished(final MergeFileWorker worker) {
+        final Task task = worker.getTask();
+        Log.d("Merge task-%d is finished", task.getId());
+        synchronized (lock) {
+            if (isRunning()) spawnWorker();
+            if (!isReleased()) {
+                getTaskManager().updateTask(task.newBuilder().setState(Task.State.FINISHED)
+                        .setMessage("Successful").build());
+                mModeratorExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        mWorkers.remove(MERGE_KEY_PREFIX + worker.getTask().getId());
+                        List<Chunk> chunks = getTaskManager().getChunksOfTask(task);
+                        for (Chunk chunk : chunks) {
+                            String chunkFile = getFileManager().getChunkFile(task, chunk.getId());
+                            getFileManager().deleteFile(chunkFile);
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    @Override
+    public void onMergeFileError(final MergeFileWorker worker, String reason, Throwable error) {
         Task task = worker.getTask();
-        Log.d("Task-%d is finished", task.getId());
-        getTaskManager().updateTask(task.newBuilder().setState(Task.State.FINISHED)
-                .setMessage("Successful").build());
-        mModeratorExecutor.execute(() -> {
-            mWorkers.remove(MERGE_KEY_PREFIX + worker.getTask().getId());
-            List<Chunk> chunks = getTaskManager().getChunksOfTask(task);
-            for (Chunk chunk : chunks) {
-                String chunkFile = getFileManager().getChunkFile(task, chunk.getId());
-                getFileManager().deleteFile(chunkFile);
+        Log.e(error, "Merge task-%d failed: %s", task.getId(), reason);
+        mModeratorExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                mWorkers.remove(MERGE_KEY_PREFIX + worker.getTask().getId());
             }
         });
         synchronized (lock) {
-            if (isRunning()) mModeratorExecutor.execute(this::spawnWorker);
+            if (isRunning()) spawnWorker();
+            if (!isReleased()) cancelTaskInternal(task, reason);
         }
     }
 
     @Override
-    public void onMergeFileError(MergeFileWorker worker, String reason, Throwable error) {
-        Task task = worker.getTask();
-        Log.e(error, "Task-%d failed: %s", task.getId(), reason);
-        cancelTaskInternal(task, reason);
-        mModeratorExecutor.execute(() -> mWorkers.remove(MERGE_KEY_PREFIX + worker.getTask().getId()));
-        synchronized (lock) {
-            if (isRunning()) mModeratorExecutor.execute(this::spawnWorker);
-        }
-    }
-
-    @Override
-    public void onMergeFileInterrupted(MergeFileWorker worker) {
+    public void onMergeFileInterrupted(final MergeFileWorker worker) {
         Log.d("Merge file interrupted (task-%d)", worker.getTask().getId());
-        mModeratorExecutor.execute(() -> mWorkers.remove(MERGE_KEY_PREFIX + worker.getTask().getId()));
+        mModeratorExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                mWorkers.remove(MERGE_KEY_PREFIX + worker.getTask().getId());
+            }
+        });
     }
 }

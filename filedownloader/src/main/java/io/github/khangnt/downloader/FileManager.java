@@ -1,8 +1,8 @@
 package io.github.khangnt.downloader;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import io.github.khangnt.downloader.model.Task;
 
@@ -12,8 +12,8 @@ import io.github.khangnt.downloader.model.Task;
  */
 
 public interface FileManager {
-    FileOutputStream openWritableFile(String filePath, boolean append) throws IOException;
-    FileInputStream openReadableFile(String filePath) throws IOException;
+    OutputStream openWritableFile(String filePath, boolean append) throws IOException;
+    InputStream openReadableFile(String filePath) throws IOException;
     boolean isFileExists(String filePath);
     long getFileSize(String filePath);
     void deleteFile(String filePath);

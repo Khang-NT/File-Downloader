@@ -1,9 +1,50 @@
+import java.util.regex.Pattern
+
+plugins {
+    id "com.jfrog.bintray" version "1.7"
+}
+
 apply plugin: 'java'
-apply plugin: 'me.tatarka.retrolambda'
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
 }
 
-sourceCompatibility = "1.8"
-targetCompatibility = "1.8"
+sourceCompatibility = "1.7"
+targetCompatibility = "1.7"
+
+group = 'com.github.khangnt'
+version = project.hasProperty('releaseTag') ? releaseTag.replaceAll('release-v', '') : ''
+
+bintrayUpload {}.doFirst {
+    Pattern pattern = Pattern.compile("^(\\d+)(\\.\\d+)+\$")
+    if (!pattern.matcher(project.version).find())
+        throw new RuntimeException("Invalid version: $project.version")
+}
+
+
+bintray {
+    Properties properties = new Properties()
+    File localPropsFile = project.rootProject.file('local.properties')
+    def bintrayUser = null
+    def bintrayApiKey = null
+    if (localPropsFile.exists()) {
+        properties.load(localPropsFile.newDataInputStream())
+        bintrayUser = properties.getProperty('bintrayUser')
+        bintrayApiKey = properties.getProperty('bintrayApiKey')
+    }
+    user = bintrayUser != null ? bintrayUser : System.getenv('BINTRAY_USER')
+    key = bintrayApiKey != null ? bintrayApiKey : System.getenv('BINTRAY_API_KEY')
+    configurations = ['archives']
+    pkg {
+        repo = 'maven'
+        name = 'Java-File-Downloader'
+        userOrg = user
+        licenses = ['Apache-2.0']
+        vcsUrl = 'https://github.com/Khang-NT/File-Downloader.git'
+        version {
+            name = project.version
+            vcsTag = "release-v$project.version"
+        }
+    }
+}

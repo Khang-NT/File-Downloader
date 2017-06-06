@@ -2,7 +2,6 @@ package io.github.khangnt.downloader;
 
 import java.util.List;
 
-import io.github.khangnt.downloader.model.Task;
 import io.github.khangnt.downloader.model.TaskReport;
 
 /**
@@ -11,10 +10,12 @@ import io.github.khangnt.downloader.model.TaskReport;
  */
 
 public interface EventListener {
-    void onTaskAdded(Task task);
-    void onTaskRemoved(Task task);
-    void onTaskFinished(Task task);
-    void onQueueChanged(List<TaskReport> queue);
+    void onTaskAdded(TaskReport taskReport);
+    void onTaskUpdated(TaskReport taskReport);
+    void onTaskCancelled(TaskReport taskReport);
+    void onTaskFinished(TaskReport taskReport);
+    void onTaskFailed(TaskReport taskReport);
+    void onQueueUpdated(List<TaskReport> queue);
     void onResumed();
     void onPaused();
 }

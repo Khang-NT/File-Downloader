@@ -15,13 +15,14 @@ public class ChunkReport {
     public ChunkReport(Chunk chunk, String chunkFile, FileManager fileManager) {
         this.mChunk = chunk;
         this.mFileManager = fileManager;
+        this.mChunkFile = chunkFile;
     }
 
     public Chunk getChunk() {
         return mChunk;
     }
 
-    public String getCHunkFile() {
+    public String getChunkFile() {
         return mChunkFile;
     }
 
@@ -31,5 +32,21 @@ public class ChunkReport {
         } else {
             return mFileManager.getFileSize(mChunkFile);
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        ChunkReport that = (ChunkReport) o;
+
+        return mChunk.equals(that.mChunk);
+
+    }
+
+    @Override
+    public int hashCode() {
+        return mChunk.hashCode();
     }
 }

@@ -13,5 +13,5 @@ import io.github.khangnt.downloader.model.Task;
 
 public interface HttpClient {
     InputStream openConnection(Task task, Map<String, String> headers) throws IOException;
-    long fetchContentLength(Task task) throws IOException;
+    long fetchContentLength(Task task);
 }
