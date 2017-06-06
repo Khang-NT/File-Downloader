@@ -12,7 +12,8 @@ cache:
   directories:
     - $HOME/.gradle/caches/
     - $HOME/.gradle/wrapper/
-install: echo "Skip"
+install:
+  - echo "org.gradle.daemon=false" >> gradle.properties
 script:
   - ./gradlew clean build test
 after_success:
