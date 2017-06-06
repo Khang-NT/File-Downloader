@@ -1,0 +1,11 @@
+language: java
+branches:
+  only:
+    - master
+    - /^release-v.*/
+jdk:
+  - oraclejdk7
+script:
+  - ./gradlew clean build test
+after_success:
+  - if [[ $TRAVIS_TAG =~ "^release-v[[:digit:]]+(\\.[[:digit:]]+)+$" ]] then ./gradlew bintrayUpload -PreleaseTag=$TRAVIS_TAG; fi;

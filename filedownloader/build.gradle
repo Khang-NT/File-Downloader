@@ -1,3 +1,5 @@
+import java.util.regex.Pattern
+
 plugins {
     id "com.jfrog.bintray" version "1.7"
 }
@@ -17,11 +19,18 @@ def bintrayUser = properties.getProperty('bintrayUser')
 def bintrayApiKey = properties.getProperty('bintrayApiKey')
 
 group = 'com.github.khangnt'
-version = '0.1'
+version = project.hasProperty('releaseTag') ? releaseTag.replaceAll('release-v', '') : ''
+
+bintrayUpload {}.doFirst {
+    Pattern pattern = Pattern.compile("^(\\d+)(\\.\\d+)+\$")
+    if (!pattern.matcher(project.version).find())
+        throw new RuntimeException("Invalid version: $project.version")
+}
+
 
 bintray {
-    user = project.hasProperty('bintrayUser') ? bintrayUser : System.getenv('BINTRAY_USER')
-    key = project.hasProperty('bintrayApiKey') ? bintrayApiKey : System.getenv('BINTRAY_API_KEY')
+    user = bintrayUser != null ? bintrayUser : System.getenv('BINTRAY_USER')
+    key = bintrayApiKey != null ? bintrayApiKey : System.getenv('BINTRAY_API_KEY')
     configurations = ['archives']
     pkg {
         repo = 'maven'
@@ -30,8 +39,8 @@ bintray {
         licenses = ['Apache-2.0']
         vcsUrl = 'https://github.com/Khang-NT/File-Downloader.git'
         version {
-            name = version
-            vcsTag = "release-v${version}"
+            name = project.version
+            vcsTag = "release-v$project.version"
         }
     }
 }
