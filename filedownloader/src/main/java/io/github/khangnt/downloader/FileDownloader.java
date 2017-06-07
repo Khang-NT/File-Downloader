@@ -90,18 +90,18 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     @Override
     public void start() {
         synchronized (lock) {
-            mRunning = true;
+            if (!isRunning()) {
+                mRunning = true;
+                mDownloadSpeedMeter.start();
+                mEventDispatcher.onResumed();
+            }
             spawnWorker();
-            mDownloadSpeedMeter.start();
-            mEventDispatcher.onResumed();
         }
     }
 
     @Override
     public void pause() {
         synchronized (lock) {
-            mRunning = false;
-            mDownloadSpeedMeter.pause();
             mModeratorExecutor.execute(new Runnable() {
                 @Override
                 public void run() {
@@ -123,7 +123,12 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
 
                 }
             });
-            mEventDispatcher.onPaused();
+
+            if (isRunning()) {
+                mRunning = false;
+                mDownloadSpeedMeter.pause();
+                mEventDispatcher.onPaused();
+            }
         }
     }
 
@@ -133,7 +138,6 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
             pause();
             mModeratorExecutor.executeAllPendingRunnable();
             mEventDispatcher.unregisterAllListener();
-            mTaskManager.release();
             mFileManager = null;
             mHttpClient = null;
             mTaskManager = null;

@@ -28,5 +28,4 @@ public interface TaskManager {
 
     void cleanUpFinishedTasks();
 
-    void release();
 }
