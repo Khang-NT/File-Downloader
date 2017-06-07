@@ -154,12 +154,4 @@ public class NonPersistentTaskManager implements TaskManager {
             }
         }
     }
-
-    @Override
-    public void release() {
-        mTaskMap.clear();
-        mChunkMap.clear();
-        mTaskMap = null;
-        mChunkMap = null;
-    }
 }
