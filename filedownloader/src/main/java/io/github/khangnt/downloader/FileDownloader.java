@@ -474,8 +474,11 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
         synchronized (lock) {
             if (isRunning()) spawnWorker();
             if (!isReleased()) {
-                getTaskManager().updateTask(task.newBuilder().setState(Task.State.FINISHED)
+                Task finishedTask = getTaskManager().updateTask(task.newBuilder()
+                        .setState(Task.State.FINISHED)
                         .setMessage("Successful").build());
+                updateTaskReport(finishedTask, false);
+                mEventDispatcher.onTaskFinished(getTaskReport(finishedTask));
                 mModeratorExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
