@@ -2,6 +2,7 @@ package io.github.khangnt.downloader.worker;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Locale;
@@ -114,7 +115,7 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
                 mTaskManager.updateChunk(mChunk = builder.build());
                 onChunkFinished(this);
                 return;
-            } catch (InterruptedException ex) {
+            } catch (InterruptedIOException | InterruptedException ex) {
                 onChunkInterrupted(this);
                 return;
             } catch (Exception ex) {
