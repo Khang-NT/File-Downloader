@@ -145,6 +145,13 @@ public class NonPersistentTaskManager implements TaskManager {
     }
 
     @Override
+    public List<Task> getAllTasks() {
+        synchronized (this) {
+            return new ArrayList<>(mTaskMap.values());
+        }
+    }
+
+    @Override
     public void cleanUpFinishedTasks() {
         synchronized (this) {
             List<Task> finishedTasks = getDoneTasks();

@@ -25,6 +25,7 @@ public interface TaskManager {
 
     List<Task> getUndoneTasks();
     List<Task> getDoneTasks();
+    List<Task> getAllTasks();
 
     void cleanUpFinishedTasks();
 
