@@ -120,7 +120,7 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
             } catch (Exception ex) {
                 lastException = ex;
                 retryTime++;
-                Log.d(ex, "[Chunk-%d] Chunk download failed, retry %d", retryTime);
+                Log.d(ex, "[Chunk-%d] Chunk download failed, retry %d", mChunk.getId(), retryTime);
             }
         }
         onChunkError(this, "Exceed max retry: " + lastException.getMessage(), lastException);
