@@ -49,6 +49,10 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
 
     private Map<Integer, TaskReport> mTaskReportMap;
 
+    public FileDownloader() {
+        this(new DefaultFileManager(), new DefaultHttpClient(), new NonPersistentTaskManager());
+    }
+
     public FileDownloader(FileManager fileManager, HttpClient httpClient, TaskManager taskManager) {
         mFileManager = fileManager;
         mHttpClient = httpClient;
