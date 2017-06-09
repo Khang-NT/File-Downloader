@@ -15,6 +15,7 @@ import io.github.khangnt.downloader.model.Chunk;
 import io.github.khangnt.downloader.model.ChunkReport;
 import io.github.khangnt.downloader.model.Task;
 import io.github.khangnt.downloader.model.TaskReport;
+import io.github.khangnt.downloader.util.Utils;
 import io.github.khangnt.downloader.worker.ChunkWorker;
 import io.github.khangnt.downloader.worker.ChunkWorkerListener;
 import io.github.khangnt.downloader.worker.MergeFileWorker;
@@ -379,7 +380,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
             Collections.sort(runningChunks, new Comparator<ChunkWorker>() {
                 @Override
                 public int compare(ChunkWorker c1, ChunkWorker c2) {
-                    return -Long.compare(c1.getRemainingBytes(), c2.getRemainingBytes());
+                    return - Utils.compare(c1.getRemainingBytes(), c2.getRemainingBytes());
                 }
             });
             for (ChunkWorker worker : runningChunks) {

@@ -13,6 +13,7 @@ import io.github.khangnt.downloader.C;
 import io.github.khangnt.downloader.FileManager;
 import io.github.khangnt.downloader.model.Chunk;
 import io.github.khangnt.downloader.model.Task;
+import io.github.khangnt.downloader.util.Utils;
 
 import static io.github.khangnt.downloader.util.Utils.checkInterrupted;
 
@@ -40,7 +41,7 @@ public class MergeFileWorker extends Thread implements MergeFileWorkerListener {
         Collections.sort(mChunkList, new Comparator<Chunk>() {
             @Override
             public int compare(Chunk c1, Chunk c2) {
-                return Long.compare(c1.getBegin(), c2.getBegin());
+                return Utils.compare(c1.getBegin(), c2.getBegin());
             }
         });
     }
@@ -67,8 +68,7 @@ public class MergeFileWorker extends Thread implements MergeFileWorkerListener {
                         os.write(buffer, 0, len);
                     }
                 } catch (IOException ex) {
-                    onMergeFileError(this, "Can't merge chunk-" + chunk.getId() +
-                            " to destination file: " + ex.getMessage(), ex);
+                    onMergeFileError(this, "Can't concat chunks: " + ex.getMessage(), ex);
                     return;
                 } finally {
                     try {

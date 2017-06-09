@@ -68,6 +68,10 @@ public class Task {
         return mMaxParallelConnections;
     }
 
+    public boolean isDone() {
+        return mState == State.FINISHED || mState == State.FAILED;
+    }
+
     public Builder newBuilder() {
         return new Builder(getFilePath(), getUrl())
                 .setId(getId())
