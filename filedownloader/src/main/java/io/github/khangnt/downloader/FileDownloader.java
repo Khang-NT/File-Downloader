@@ -424,6 +424,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                         getFileManager().deleteFile(chunkFile);
                     }
                 }
+                getFileManager().deleteFile(task.getFilePath());
             }
         });
         return cancelledTask;
