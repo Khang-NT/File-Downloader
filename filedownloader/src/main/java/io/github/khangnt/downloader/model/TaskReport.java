@@ -53,6 +53,15 @@ public class TaskReport {
     }
 
     @Override
+    public String toString() {
+        return "TaskReport{" +
+                "mTask=" + mTask +
+                "bytesDownloaded=" + calculateDownloadedLength() +
+                "percentDownloaded=" + calculatePercentDownloaded() +
+                '}';
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;

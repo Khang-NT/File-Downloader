@@ -15,6 +15,7 @@ import io.github.khangnt.downloader.model.Chunk;
 import io.github.khangnt.downloader.model.ChunkReport;
 import io.github.khangnt.downloader.model.Task;
 import io.github.khangnt.downloader.model.TaskReport;
+import io.github.khangnt.downloader.util.Utils;
 import io.github.khangnt.downloader.worker.ChunkWorker;
 import io.github.khangnt.downloader.worker.ChunkWorkerListener;
 import io.github.khangnt.downloader.worker.MergeFileWorker;
@@ -202,8 +203,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
             List<ChunkReport> chunkReports = new ArrayList<>();
             List<Chunk> chunks = getTaskManager().getChunksOfTask(task);
             for (Chunk chunk : chunks) {
-                chunkReports.add(new ChunkReport(chunk,
-                        getFileManager().getChunkFile(task, chunk.getId()), getFileManager()));
+                chunkReports.add(new ChunkReport(chunk, getFileManager()));
             }
             taskReport = new TaskReport(task, chunkReports);
             mTaskReportMap.put(task.getId(), taskReport);
@@ -219,8 +219,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                 chunkReports = new ArrayList<>();
                 List<Chunk> chunks = getTaskManager().getChunksOfTask(task);
                 for (Chunk chunk : chunks) {
-                    chunkReports.add(new ChunkReport(chunk,
-                            getFileManager().getChunkFile(task, chunk.getId()), getFileManager()));
+                    chunkReports.add(new ChunkReport(chunk, getFileManager()));
                 }
             }
             taskReport = new TaskReport(task, chunkReports);
@@ -298,7 +297,8 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
         if (after.getLength() == C.UNSET)
             after.setLength(getHttpClient().fetchContentLength(task));
         if (!after.isResumable()) {
-            getTaskManager().insertChunk(new Chunk.Builder(after.getId()).build());
+            getTaskManager().insertChunk(new Chunk.Builder(after.getId(),
+                    mFileManager.getUniqueTempFile(task)).build());
         } else {
             long length = after.getLength();
             int numberOfChunks = 1;
@@ -307,11 +307,13 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                 numberOfChunks++;
             final long lengthPerChunk = length / numberOfChunks;
             for (int i = 0; i < numberOfChunks - 1; i++) {
-                getTaskManager().insertChunk(new Chunk.Builder(after.getId())
+                getTaskManager().insertChunk(new Chunk.Builder(after.getId(),
+                        mFileManager.getUniqueTempFile(task))
                         .setRange(i * lengthPerChunk, (i + 1) * lengthPerChunk - 1)
                         .build());
             }
-            getTaskManager().insertChunk(new Chunk.Builder(after.getId())
+            getTaskManager().insertChunk(new Chunk.Builder(after.getId(),
+                    mFileManager.getUniqueTempFile(task))
                     .setRange((numberOfChunks - 1) * lengthPerChunk, length - 1)
                     .build());
         }
@@ -326,8 +328,8 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
             if (mWorkers.size() < getMaxWorkers()) {
                 ChunkWorker chunkWorker = (ChunkWorker) mWorkers.get(CHUNK_KEY_PREFIX + chunk.getId());
                 if (chunkWorker == null) {
-                    chunkWorker = new ChunkWorker(chunk, mFileManager.getChunkFile(task, chunk.getId()),
-                            getHttpClient(), getTaskManager(), getFileManager(), mDownloadSpeedMeter, this);
+                    chunkWorker = new ChunkWorker(chunk, getHttpClient(), getTaskManager(),
+                            getFileManager(), mDownloadSpeedMeter, this);
                     chunkWorker.start();
                     Log.d("Spawn worker %s for task %d", CHUNK_KEY_PREFIX + chunk.getId(), task.getId());
                     mWorkers.put(CHUNK_KEY_PREFIX + chunk.getId(), chunkWorker);
@@ -379,11 +381,11 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
             Collections.sort(runningChunks, new Comparator<ChunkWorker>() {
                 @Override
                 public int compare(ChunkWorker c1, ChunkWorker c2) {
-                    return -Long.compare(c1.getRemainingBytes(), c2.getRemainingBytes());
+                    return - Utils.compare(c1.getRemainingBytes(), c2.getRemainingBytes());
                 }
             });
             for (ChunkWorker worker : runningChunks) {
-                Chunk newChunk = worker.splitChunk();
+                Chunk newChunk = worker.splitChunk(task);
                 if (newChunk == null) return;
                 spawnChunkWorkerIfNotExists(task, Collections.singletonList(newChunk));
                 updateTaskReport(task, true);
@@ -419,10 +421,10 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                             worker.join();
                         } catch (InterruptedException ignore) {
                         }
-                        String chunkFile = getFileManager().getChunkFile(task, chunk.getId());
-                        getFileManager().deleteFile(chunkFile);
+                        getFileManager().deleteFile(chunk.getChunkFile());
                     }
                 }
+                getFileManager().deleteFile(task.getFilePath());
             }
         });
         return cancelledTask;
@@ -489,8 +491,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                         mWorkers.remove(MERGE_KEY_PREFIX + worker.getTask().getId());
                         List<Chunk> chunks = getTaskManager().getChunksOfTask(task);
                         for (Chunk chunk : chunks) {
-                            String chunkFile = getFileManager().getChunkFile(task, chunk.getId());
-                            getFileManager().deleteFile(chunkFile);
+                            getFileManager().deleteFile(chunk.getChunkFile());
                         }
                     }
                 });

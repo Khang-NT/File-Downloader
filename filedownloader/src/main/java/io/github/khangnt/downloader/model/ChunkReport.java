@@ -9,13 +9,11 @@ import io.github.khangnt.downloader.FileManager;
 
 public class ChunkReport {
     private Chunk mChunk;
-    private String mChunkFile;
     private FileManager mFileManager;
 
-    public ChunkReport(Chunk chunk, String chunkFile, FileManager fileManager) {
+    public ChunkReport(Chunk chunk, FileManager fileManager) {
         this.mChunk = chunk;
         this.mFileManager = fileManager;
-        this.mChunkFile = chunkFile;
     }
 
     public Chunk getChunk() {
@@ -23,14 +21,14 @@ public class ChunkReport {
     }
 
     public String getChunkFile() {
-        return mChunkFile;
+        return mChunk.getChunkFile();
     }
 
     public long getDownloadedLength() {
         if (mChunk.isFinished() && mChunk.isResumable()) {
             return mChunk.getEnd() - mChunk.getBegin();
         } else {
-            return mFileManager.getFileSize(mChunkFile);
+            return mFileManager.getFileSize(getChunkFile());
         }
     }
 

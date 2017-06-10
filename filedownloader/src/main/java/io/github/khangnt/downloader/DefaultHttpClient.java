@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import io.github.khangnt.downloader.model.Task;
+import io.github.khangnt.downloader.util.Utils;
 
 /**
  * Created by Khang NT on 6/5/17.
@@ -27,8 +28,9 @@ public class DefaultHttpClient implements HttpClient {
         headers.put("Range", "bytes=0-");
         try {
             HttpURLConnection connection = openConnection(task.getUrl(), headers, "HEAD");
-            long length = connection.getContentLengthLong();
-            return length == -1 ? C.UNKNOWN_LENGTH : length;
+            String contentLength = connection.getHeaderField("Content-Length");
+            if (Utils.isEmpty(contentLength)) return 0;
+            else return Long.parseLong(contentLength);
         } catch (IOException ex) {
             Log.d("Can't get content length of task-%d", task.getId());
             return C.UNKNOWN_LENGTH;

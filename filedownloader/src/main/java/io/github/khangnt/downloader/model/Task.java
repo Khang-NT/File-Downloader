@@ -68,6 +68,10 @@ public class Task {
         return mMaxParallelConnections;
     }
 
+    public boolean isDone() {
+        return mState == State.FINISHED || mState == State.FAILED;
+    }
+
     public Builder newBuilder() {
         return new Builder(getFilePath(), getUrl())
                 .setId(getId())
@@ -97,6 +101,20 @@ public class Task {
         result = 31 * result + mUrl.hashCode();
         result = 31 * result + mFilePath.hashCode();
         return result;
+    }
+
+    @Override
+    public String toString() {
+        return "Task{" +
+                "mId=" + mId +
+                ", mUrl='" + mUrl + '\'' +
+                ", mFilePath='" + mFilePath + '\'' +
+                ", mLength=" + mLength +
+                ", mDeveloperPayload='" + mDeveloperPayload + '\'' +
+                ", mState=" + mState +
+                ", message='" + message + '\'' +
+                ", mMaxParallelConnections=" + mMaxParallelConnections +
+                '}';
     }
 
     public static class Builder {

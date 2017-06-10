@@ -15,6 +15,7 @@ import io.github.khangnt.downloader.HttpClient;
 import io.github.khangnt.downloader.Log;
 import io.github.khangnt.downloader.TaskManager;
 import io.github.khangnt.downloader.model.Chunk;
+import io.github.khangnt.downloader.model.Task;
 
 import static io.github.khangnt.downloader.util.Utils.checkInterrupted;
 import static io.github.khangnt.downloader.util.Utils.isEmpty;
@@ -34,18 +35,16 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
     private final FileManager mFileManager;
     private final ChunkWorkerListener mListener;
     private final DownloadSpeedMeter mDownloadSpeedMeter;
-    private final String mChunkFile;
 
     private Chunk mChunk;
 
-    public ChunkWorker(Chunk chunk, String chunkFile, HttpClient httpClient, TaskManager taskManager,
+    public ChunkWorker(Chunk chunk, HttpClient httpClient, TaskManager taskManager,
                        FileManager fileManager, DownloadSpeedMeter downloadSpeedMeter,
                        ChunkWorkerListener listener) {
         this.mHttpClient = httpClient;
         this.mTaskManager = taskManager;
         this.mFileManager = fileManager;
         this.mListener = listener;
-        this.mChunkFile = chunkFile;
         this.mDownloadSpeedMeter = downloadSpeedMeter;
 
         this.mChunk = chunk;
@@ -63,7 +62,7 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
     public long getRemainingBytes() {
         if (!mChunk.isResumable())
             throw new IllegalStateException("Unknown remaining bytes of non-resumable chunk");
-        return mChunk.getLength() - mFileManager.getFileSize(mChunkFile);
+        return mChunk.getLength() - mFileManager.getFileSize(mChunk.getChunkFile());
     }
 
     public boolean isResumable() {
@@ -75,7 +74,7 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
      *
      * @return null if can't split for any reason, otherwise return a {@link Chunk} inserted to {@link TaskManager}.
      */
-    public Chunk splitChunk() {
+    public Chunk splitChunk(Task task) {
         synchronized (lock) {
             if (!mChunk.isResumable())
                 throw new IllegalStateException("Can't split chunk not resumable");
@@ -83,7 +82,8 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
             Log.d("Chunk length: %d, remaining bytes: %d", mChunk.getLength(), remainingBytes);
             if (remainingBytes >= C.MIN_CHUNK_LENGTH * 4) {
                 long splitPoint = mChunk.getEnd() - remainingBytes / 2;
-                Chunk.Builder newChunkBuilder = new Chunk.Builder(mChunk.getTaskId())
+                Chunk.Builder newChunkBuilder = new Chunk.Builder(mChunk.getTaskId(),
+                        mFileManager.getUniqueTempFile(task))
                         .setRange(splitPoint + 1, mChunk.getEnd());
                 Chunk newChunk = mTaskManager.insertChunk(newChunkBuilder.build());
                 mChunk = mTaskManager.updateChunk(mChunk.newBuilder()
@@ -131,7 +131,7 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
         long downloaded;
         String range;
         synchronized (lock) {
-            downloaded = mFileManager.getFileSize(mChunkFile);
+            downloaded = mFileManager.getFileSize(mChunk.getChunkFile());
             if (!mChunk.isResumable() && downloaded > 0) {
                 Log.d("[Chunk-%d] Re-download chunk from the beginning", mChunk.getId());
                 downloaded = 0;
@@ -189,7 +189,7 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
 
     private OutputStream openChunkFile(boolean append) throws IOException {
         try {
-            return mFileManager.openWritableFile(mChunkFile, append);
+            return mFileManager.openWritableFile(mChunk.getChunkFile(), append);
         } catch (IOException ex) {
             throw new IOException("Can't create/open chunk file", ex);
         }

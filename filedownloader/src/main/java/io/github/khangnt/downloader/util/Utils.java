@@ -14,4 +14,9 @@ public class Utils {
         if (Thread.interrupted()) throw new InterruptedException();
         return true;
     }
+
+    public static int compare(long l1, long l2) {
+        // copy of Long.compare which missing in Java 6
+        return l1 < l2 ? -1 : (l1 == l2 ? 0 : 1);
+    }
 }

@@ -1,1 +1,2 @@
 include ':app', ':filedownloader'
+project(':filedownloader').projectDir = new File(rootDir, 'filedownloader')
