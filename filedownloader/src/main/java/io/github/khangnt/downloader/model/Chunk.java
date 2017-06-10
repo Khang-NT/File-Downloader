@@ -1,5 +1,7 @@
 package io.github.khangnt.downloader.model;
 
+import io.github.khangnt.downloader.C;
+
 import static io.github.khangnt.downloader.C.UNSET;
 
 /**
@@ -8,8 +10,9 @@ import static io.github.khangnt.downloader.C.UNSET;
  */
 public class Chunk {
 
-    private int mId = UNSET;
+    private int mId = C.UNSET;
     private int mTaskId;
+    private String mChunkFile;
     private boolean mFinished = false;
     private boolean mResumable = false;
     private long mBegin = UNSET;
@@ -42,12 +45,16 @@ public class Chunk {
         return 0;
     }
 
+    public String getChunkFile() {
+        return mChunkFile;
+    }
+
     public boolean isFinished() {
         return mFinished;
     }
 
     public Builder newBuilder() {
-        return new Builder(getTaskId())
+        return new Builder(getTaskId(), getChunkFile())
                 .setId(getId())
                 .setRange(getBegin(), getEnd())
                 .setFinished(isFinished());
@@ -69,18 +76,24 @@ public class Chunk {
     public int hashCode() {
         int result = mId;
         result = 31 * result + mTaskId;
+        result = 31 * result + mChunkFile.hashCode();
+        result = 31 * result + (mFinished ? 1 : 0);
+        result = 31 * result + (mResumable ? 1 : 0);
+        result = 31 * result + (int) (mBegin ^ (mBegin >>> 32));
+        result = 31 * result + (int) (mEnd ^ (mEnd >>> 32));
         return result;
     }
 
     public static class Builder {
         private Chunk mChunk = new Chunk();
 
-        public Builder(int taskId) {
+        public Builder(int taskId, String chunkFile) {
             mChunk.mTaskId = taskId;
+            mChunk.mChunkFile = chunkFile;
         }
 
-        public Builder setId(int id) {
-            mChunk.mId = id;
+        public Builder setId(int chunkId) {
+            mChunk.mId = chunkId;
             return this;
         }
 
@@ -95,6 +108,11 @@ public class Chunk {
             mChunk.mBegin = begin;
             mChunk.mEnd = end;
             mChunk.mResumable = true;
+            return this;
+        }
+
+        public Builder setChunkFile(String chunkFile) {
+            mChunk.mChunkFile = chunkFile;
             return this;
         }
 
@@ -126,6 +144,10 @@ public class Chunk {
         public long getLength() {
             if (isResumable()) return getEnd() - getBegin() + 1;
             return 0;
+        }
+
+        public String getChunkFile() {
+            return mChunk.mChunkFile;
         }
 
         public boolean isFinished() {

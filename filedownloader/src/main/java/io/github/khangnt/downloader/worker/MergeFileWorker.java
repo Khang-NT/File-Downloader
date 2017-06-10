@@ -59,7 +59,7 @@ public class MergeFileWorker extends Thread implements MergeFileWorkerListener {
             byte buffer[] = new byte[BUFFER_SIZE];
             for (Chunk chunk : mChunkList) {
                 checkInterrupted();
-                String chunkFile = mFileManager.getChunkFile(mTask, chunk.getId());
+                String chunkFile = chunk.getChunkFile();
                 checkChunk(chunk, chunkFile);
                 InputStream is = null;
                 try {

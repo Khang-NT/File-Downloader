@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.UUID;
 
 import io.github.khangnt.downloader.model.Task;
 
@@ -40,7 +41,7 @@ public class DefaultFileManager implements FileManager {
     }
 
     @Override
-    public String getChunkFile(Task task, int chunkId) {
-        return task.getFilePath() + "." + chunkId;
+    public synchronized String getUniqueTempFile(Task task) {
+        return task.getId() + "-" + UUID.randomUUID().toString() + ".temp";
     }
 }

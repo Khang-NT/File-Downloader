@@ -103,6 +103,20 @@ public class Task {
         return result;
     }
 
+    @Override
+    public String toString() {
+        return "Task{" +
+                "mId=" + mId +
+                ", mUrl='" + mUrl + '\'' +
+                ", mFilePath='" + mFilePath + '\'' +
+                ", mLength=" + mLength +
+                ", mDeveloperPayload='" + mDeveloperPayload + '\'' +
+                ", mState=" + mState +
+                ", message='" + message + '\'' +
+                ", mMaxParallelConnections=" + mMaxParallelConnections +
+                '}';
+    }
+
     public static class Builder {
         private Task mTask = new Task();
 
