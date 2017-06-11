@@ -29,6 +29,8 @@ public class Task {
     private State mState = State.IDLE;
     private String message;
     private int mMaxParallelConnections = DEFAULT_MAX_PARALLEL_CONNECTIONS;
+    private String mCheckSumAlgorithm;
+    private String mCheckSumDigest;
 
     private Task() {}
 
@@ -68,6 +70,14 @@ public class Task {
         return mMaxParallelConnections;
     }
 
+    public String getCheckSumDigest() {
+        return mCheckSumDigest;
+    }
+
+    public String getCheckSumAlgorithm() {
+        return mCheckSumAlgorithm;
+    }
+
     public boolean isDone() {
         return mState == State.FINISHED || mState == State.FAILED;
     }
@@ -79,6 +89,7 @@ public class Task {
                 .setLength(getLength())
                 .setMessage(getMessage())
                 .setState(getState())
+                .setCheckSum(getCheckSumAlgorithm(), getCheckSumDigest())
                 .setMaxParallelConnections(getMaxParallelConnections());
     }
 
@@ -114,6 +125,8 @@ public class Task {
                 ", mState=" + mState +
                 ", message='" + message + '\'' +
                 ", mMaxParallelConnections=" + mMaxParallelConnections +
+                ", mCheckSumAlgorithm='" + mCheckSumAlgorithm + '\'' +
+                ", mCheckSumDigest='" + mCheckSumDigest + '\'' +
                 '}';
     }
 
@@ -149,6 +162,12 @@ public class Task {
 
         public Builder setMessage(String message) {
             mTask.message = message;
+            return this;
+        }
+
+        public Builder setCheckSum(String checkSumAlgorithm, String checkSumDigest) {
+            mTask.mCheckSumAlgorithm = checkSumAlgorithm;
+            mTask.mCheckSumDigest = checkSumDigest;
             return this;
         }
 
@@ -188,6 +207,14 @@ public class Task {
 
         public String getMessage() {
             return mTask.message;
+        }
+
+        public String getCheckSumDigest() {
+            return mTask.mCheckSumDigest;
+        }
+
+        public String getCheckSumAlgorithm() {
+            return mTask.mCheckSumAlgorithm;
         }
 
         public int getMaxChunks() {

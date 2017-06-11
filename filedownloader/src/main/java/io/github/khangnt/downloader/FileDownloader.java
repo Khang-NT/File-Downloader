@@ -27,7 +27,8 @@ import io.github.khangnt.downloader.worker.ModeratorExecutor;
  * Email: khang.neon.1997@gmail.com
  */
 
-public class FileDownloader implements IFileDownloader, ChunkWorkerListener, MergeFileWorkerListener {
+public class FileDownloader implements IFileDownloader, ChunkWorkerListener, MergeFileWorkerListener,
+        OnChecksumMismatchListener {
     public static final String MODERATOR_THREAD = "ModeratorThread";
 
     private static final String CHUNK_KEY_PREFIX = "chunk:";
@@ -45,10 +46,9 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     private ModeratorExecutor mModeratorExecutor;
 
     private boolean mRunning;
-
     private int mMaxWorker;
-
     private Map<Integer, TaskReport> mTaskReportMap;
+    private OnChecksumMismatchListener mOnChecksumMismatchListener;
 
     public FileDownloader() {
         this(new DefaultFileManager(), new DefaultHttpClient(), new NonPersistentTaskManager());
@@ -88,7 +88,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
         if (task == null) {
             throw new TaskNotFoundException("No task exists with this ID: " + taskId);
         }
-        Task cancelledTask = cancelTaskInternal(task, "Cancelled");
+        Task cancelledTask = cancelTaskInternal(task, "Cancelled", !task.isDone());
         mEventDispatcher.onTaskCancelled(getTaskReport(cancelledTask));
     }
 
@@ -189,6 +189,11 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     @Override
     public void unregisterListener(EventListener listener) {
         mEventDispatcher.unregisterListener(listener);
+    }
+
+    @Override
+    public void setOnChecksumMismatchListener(OnChecksumMismatchListener listener) {
+        mOnChecksumMismatchListener = listener;
     }
 
     @Override
@@ -402,7 +407,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
         return true;
     }
 
-    private Task cancelTaskInternal(final Task task, String message) {
+    private Task cancelTaskInternal(final Task task, String message, final boolean deleteFile) {
         Task cancelledTask = task.newBuilder().setState(Task.State.FAILED)
                 .setMessage(message)
                 .build();
@@ -424,7 +429,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                         getFileManager().deleteFile(chunk.getChunkFile());
                     }
                 }
-                getFileManager().deleteFile(task.getFilePath());
+                if (deleteFile) getFileManager().deleteFile(task.getFilePath());
             }
         });
         return cancelledTask;
@@ -456,7 +461,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                 Task task = getTaskManager().findTask(worker.getChunk().getTaskId());
                 if (task == null)
                     throw new TaskNotFoundException("Something went wrong, task was removed while chunks were downloading");
-                cancelTaskInternal(task, reason);
+                cancelTaskInternal(task, reason, true);
                 mEventDispatcher.onTaskFailed(getTaskReport(task));
             }
         }
@@ -474,14 +479,16 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     }
 
     @Override
-    public void onMergeFileFinished(final MergeFileWorker worker) {
+    public void onMergeFileFinished(final MergeFileWorker worker, final long fileLength, String checkSum) {
         final Task task = worker.getTask();
         Log.d("Merge task-%d is finished", task.getId());
         synchronized (lock) {
             if (isRunning()) spawnWorker();
             if (!isReleased()) {
                 Task finishedTask = getTaskManager().updateTask(task.newBuilder()
+                        .setLength(fileLength)
                         .setState(Task.State.FINISHED)
+                        .setCheckSum(task.getCheckSumAlgorithm(), checkSum)
                         .setMessage("Successful").build());
                 updateTaskReport(finishedTask, false);
                 mEventDispatcher.onTaskFinished(getTaskReport(finishedTask));
@@ -512,7 +519,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
         synchronized (lock) {
             if (isRunning()) spawnWorker();
             if (!isReleased()) {
-                cancelTaskInternal(task, reason);
+                cancelTaskInternal(task, reason, true);
                 mEventDispatcher.onTaskFailed(getTaskReport(task));
             }
         }
@@ -527,5 +534,32 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                 mWorkers.remove(MERGE_KEY_PREFIX + worker.getTask().getId());
             }
         });
+    }
+
+    @Override
+    public void onCheckSumFailed(final MergeFileWorker worker, String algorithm, String expect, String found) {
+        Task task = worker.getTask();
+        Log.e("task-%d onCheckSumFailed (%s) [%s] [%s]", task.getId(), algorithm, expect, found);
+        mModeratorExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                mWorkers.remove(MERGE_KEY_PREFIX + worker.getTask().getId());
+            }
+        });
+        boolean shouldDeleteFile = onChecksumMismatch(task, algorithm, expect, found);
+        synchronized (lock) {
+            if (isRunning()) spawnWorker();
+            if (!isReleased()) {
+                cancelTaskInternal(task, algorithm + " checksum mismatch", shouldDeleteFile);
+                mEventDispatcher.onTaskFailed(getTaskReport(task));
+            }
+        }
+    }
+
+    @Override
+    public boolean onChecksumMismatch(Task task, String algorithm, String expected, String found) {
+        if (mOnChecksumMismatchListener != null)
+            return mOnChecksumMismatchListener.onChecksumMismatch(task, algorithm, expected, found);
+        return false;
     }
 }

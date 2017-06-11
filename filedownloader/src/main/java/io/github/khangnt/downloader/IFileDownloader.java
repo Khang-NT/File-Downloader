@@ -31,6 +31,8 @@ public interface IFileDownloader {
     void clearAllListener();
     void unregisterListener(EventListener listener);
 
+    void setOnChecksumMismatchListener(OnChecksumMismatchListener listener);
+
     long getSpeed();
 
     TaskReport getTaskReport(Task task);

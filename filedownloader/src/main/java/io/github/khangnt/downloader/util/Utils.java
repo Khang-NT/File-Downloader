@@ -19,4 +19,12 @@ public class Utils {
         // copy of Long.compare which missing in Java 6
         return l1 < l2 ? -1 : (l1 == l2 ? 0 : 1);
     }
+
+    public static String byteArrToHex(byte[] arr) {
+        String result = "";
+        for (int i = 0; i < arr.length; i++) {
+            result += Integer.toString((arr[i] & 0xff) + 0x100, 16).substring(1);
+        }
+        return result;
+    }
 }
