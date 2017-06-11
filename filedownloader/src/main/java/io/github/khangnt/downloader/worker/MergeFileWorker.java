@@ -53,6 +53,7 @@ public class MergeFileWorker extends Thread implements MergeFileWorkerListener {
     @Override
     public void run() {
         OutputStream os = null;
+        long fileLength = 0;
         try {
             os = mFileManager.openWritableFile(mTask.getFilePath(), false);
             int len;
@@ -66,6 +67,7 @@ public class MergeFileWorker extends Thread implements MergeFileWorkerListener {
                     is = mFileManager.openReadableFile(chunkFile);
                     while (checkInterrupted() && (len = is.read(buffer, 0, BUFFER_SIZE)) > 0) {
                         os.write(buffer, 0, len);
+                        fileLength += len;
                     }
                 } catch (IOException ex) {
                     onMergeFileError(this, "Can't concat chunks: " + ex.getMessage(), ex);
@@ -91,7 +93,7 @@ public class MergeFileWorker extends Thread implements MergeFileWorkerListener {
         }
 
         // merge successful
-        onMergeFileFinished(this);
+        onMergeFileFinished(this, fileLength);
     }
 
     private void checkChunk(Chunk chunk, String chunkFile) {
@@ -106,8 +108,8 @@ public class MergeFileWorker extends Thread implements MergeFileWorkerListener {
     }
 
     @Override
-    public void onMergeFileFinished(MergeFileWorker worker) {
-        if (mListener != null) mListener.onMergeFileFinished(worker);
+    public void onMergeFileFinished(MergeFileWorker worker, long fileLength) {
+        if (mListener != null) mListener.onMergeFileFinished(worker, fileLength);
     }
 
     @Override

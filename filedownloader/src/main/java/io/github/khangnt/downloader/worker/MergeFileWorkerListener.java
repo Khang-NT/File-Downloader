@@ -6,7 +6,7 @@ package io.github.khangnt.downloader.worker;
  */
 
 public interface MergeFileWorkerListener {
-    void onMergeFileFinished(MergeFileWorker worker);
+    void onMergeFileFinished(MergeFileWorker worker, long fileLength);
     void onMergeFileError(MergeFileWorker worker, String reason, Throwable error);
     void onMergeFileInterrupted(MergeFileWorker worker);
 }

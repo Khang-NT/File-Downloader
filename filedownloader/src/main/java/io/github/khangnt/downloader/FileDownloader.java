@@ -474,13 +474,14 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     }
 
     @Override
-    public void onMergeFileFinished(final MergeFileWorker worker) {
+    public void onMergeFileFinished(final MergeFileWorker worker, final long fileLength) {
         final Task task = worker.getTask();
         Log.d("Merge task-%d is finished", task.getId());
         synchronized (lock) {
             if (isRunning()) spawnWorker();
             if (!isReleased()) {
                 Task finishedTask = getTaskManager().updateTask(task.newBuilder()
+                        .setLength(fileLength)
                         .setState(Task.State.FINISHED)
                         .setMessage("Successful").build());
                 updateTaskReport(finishedTask, false);
