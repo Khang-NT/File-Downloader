@@ -181,7 +181,7 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
                     }
                 }
                 mDownloadSpeedMeter.onBytesDownloaded(read);
-                if (downloaded >= mChunk.getLength()) break;
+                if (mChunk.isResumable() && downloaded >= mChunk.getLength()) break;
             }
         }
         return downloaded;

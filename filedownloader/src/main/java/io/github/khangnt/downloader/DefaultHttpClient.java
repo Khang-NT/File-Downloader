@@ -23,17 +23,32 @@ public class DefaultHttpClient implements HttpClient {
     }
 
     @Override
-    public long fetchContentLength(Task task) {
+    public ContentDescription fetchContentDescription(Task task) {
         Map<String, String> headers = new HashMap<>();
         headers.put("Range", "bytes=0-");
         try {
             HttpURLConnection connection = openConnection(task.getUrl(), headers, "HEAD");
             String contentLength = connection.getHeaderField("Content-Length");
-            if (Utils.isEmpty(contentLength)) return 0;
-            else return Long.parseLong(contentLength);
+            boolean acceptRange = false;
+            long length;
+            if (Utils.isEmpty(contentLength)) {
+                length = 0;
+            } else {
+                length = Long.parseLong(contentLength);
+            }
+            if (length > 0) {
+                String acceptRangeHeader = connection.getHeaderField("Accept-Ranges");
+                if (acceptRangeHeader == null) {
+                    // accept-range is not presented --> check Content-Range header
+                    acceptRange = connection.getHeaderField("Content-Range") != null;
+                } else {
+                    acceptRange = !acceptRangeHeader.trim().equalsIgnoreCase("none");
+                }
+            }
+            return new ContentDescription(length, acceptRange);
         } catch (IOException ex) {
             Log.d("Can't get content length of task-%d", task.getId());
-            return C.UNKNOWN_LENGTH;
+            return new ContentDescription(C.UNKNOWN_LENGTH, false);
         }
     }
 
