@@ -12,6 +12,24 @@ import io.github.khangnt.downloader.model.Task;
  */
 
 public interface HttpClient {
+    class ContentDescription {
+        private long mLength = C.UNSET;
+        private boolean mAcceptRange = false;
+
+        public ContentDescription(long mLength, boolean mAcceptRange) {
+            this.mLength = mLength;
+            this.mAcceptRange = mAcceptRange;
+        }
+
+        public long getLength() {
+            return mLength;
+        }
+
+        public boolean isAcceptRange() {
+            return mAcceptRange;
+        }
+    }
+
     InputStream openConnection(Task task, Map<String, String> headers) throws IOException;
-    long fetchContentLength(Task task);
+    ContentDescription fetchContentDescription(Task task);
 }

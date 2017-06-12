@@ -25,6 +25,7 @@ public class Task {
     private String mUrl;
     private String mFilePath;
     private long mLength = UNSET;
+    private boolean mResumable = false;
     private String mDeveloperPayload;
     private State mState = State.IDLE;
     private String message;
@@ -51,7 +52,7 @@ public class Task {
     }
 
     public boolean isResumable() {
-        return mLength > 0;
+        return mResumable;
     }
 
     public String getDeveloperPayload() {
@@ -87,6 +88,7 @@ public class Task {
                 .setId(getId())
                 .setDeveloperPayload(getDeveloperPayload())
                 .setLength(getLength())
+                .setResumable(isResumable())
                 .setMessage(getMessage())
                 .setState(getState())
                 .setCheckSum(getCheckSumAlgorithm(), getCheckSumDigest())
@@ -121,6 +123,7 @@ public class Task {
                 ", mUrl='" + mUrl + '\'' +
                 ", mFilePath='" + mFilePath + '\'' +
                 ", mLength=" + mLength +
+                ", mResumable=" + mResumable +
                 ", mDeveloperPayload='" + mDeveloperPayload + '\'' +
                 ", mState=" + mState +
                 ", message='" + message + '\'' +
@@ -152,6 +155,11 @@ public class Task {
 
         public Builder setLength(long length) {
             mTask.mLength = length;
+            return this;
+        }
+
+        public Builder setResumable(boolean resumable) {
+            mTask.mResumable = resumable;
             return this;
         }
 
@@ -194,7 +202,7 @@ public class Task {
         }
 
         public boolean isResumable() {
-            return mTask.mLength > 0;
+            return mTask.mResumable;
         }
 
         public String getDeveloperPayload() {

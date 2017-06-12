@@ -299,8 +299,11 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
         Log.d("Initializing task-%d...", task.getId());
         mTaskManager.removeChunksOfTask(task);
         Task.Builder after = task.newBuilder();
-        if (after.getLength() == C.UNSET)
-            after.setLength(getHttpClient().fetchContentLength(task));
+        if (after.getLength() == C.UNSET) {
+            HttpClient.ContentDescription contentDescription = getHttpClient().fetchContentDescription(task);
+            after.setLength(contentDescription.getLength())
+                    .setResumable(contentDescription.isAcceptRange());
+        }
         if (!after.isResumable()) {
             getTaskManager().insertChunk(new Chunk.Builder(after.getId(),
                     mFileManager.getUniqueTempFile(task)).build());
