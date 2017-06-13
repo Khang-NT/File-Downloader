@@ -3,6 +3,8 @@ package io.github.khangnt.downloader.model;
 import java.util.Collections;
 import java.util.List;
 
+import io.github.khangnt.downloader.C;
+
 /**
  * Created by Khang NT on 6/2/17.
  * Email: khang.neon.1997@gmail.com
@@ -36,7 +38,7 @@ public class TaskReport {
             case DOWNLOADING:
             case WAITING:
             default:
-                if (mTask.isResumable()) {
+                if (mTask.getLength() != C.UNKNOWN_LENGTH) {
                     return calculateDownloadedLength() * 100f / mTask.getLength();
                 } else {
                     // stream with unknown length, we can't calculate percent downloaded
