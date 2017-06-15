@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
-import io.github.khangnt.downloader.exception.TaskNotFoundException;
 import io.github.khangnt.downloader.model.Chunk;
 import io.github.khangnt.downloader.model.ChunkReport;
 import io.github.khangnt.downloader.model.Task;
@@ -83,13 +82,22 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     }
 
     @Override
-    public void cancelTask(int taskId) {
-        Task task = getTaskManager().findTask(taskId);
-        if (task == null) {
-            throw new TaskNotFoundException("No task exists with this ID: " + taskId);
-        }
-        Task cancelledTask = cancelTaskInternal(task, "Cancelled", !task.isDone());
-        mEventDispatcher.onTaskCancelled(getTaskReport(cancelledTask));
+    public void cancelTask(final int taskId) {
+        mModeratorExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                Task task = getTaskManager().findTask(taskId);
+                if (task != null && !task.isDone()) {
+                    stopAllWorkerOfTaskSync(task);
+                    getFileManager().deleteFile(task.getFilePath());
+                    Task cancelledTask = getTaskManager().updateTask(task.newBuilder()
+                            .setState(Task.State.FAILED)
+                            .setMessage("Cancelled").build());
+                    updateTaskReport(cancelledTask, false);
+                    mEventDispatcher.onTaskCancelled(getTaskReport(cancelledTask));
+                }
+            }
+        });
     }
 
     @Override
@@ -410,32 +418,55 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
         return true;
     }
 
-    private Task cancelTaskInternal(final Task task, String message, final boolean deleteFile) {
-        Task cancelledTask = task.newBuilder().setState(Task.State.FAILED)
-                .setMessage(message)
-                .build();
-        getTaskManager().updateTask(cancelledTask);
-        updateTaskReport(cancelledTask, false);
+//    private Task cancelTaskInternal(final Task task, final Callback1<Task> onCanceleld) {
+////        Task cancelledTask = task.newBuilder().setState(Task.State.FAILED)
+////                .setMessage(message)
+////                .build();
+////        getTaskManager().updateTask(cancelledTask);
+////        updateTaskReport(cancelledTask, false);
+//
+//        mModeratorExecutor.execute(new Runnable() {
+//            @Override
+//            public void run() {
+//                List<Chunk> chunksOfTask = getTaskManager().getChunksOfTask(task);
+//                for (Chunk chunk : chunksOfTask) {
+//                    ChunkWorker worker = (ChunkWorker) mWorkers.remove(CHUNK_KEY_PREFIX + chunk.getId());
+//                    if (worker != null) {
+//                        worker.interrupt();
+//                        try {
+//                            worker.join();
+//                        } catch (InterruptedException ignore) {
+//                        }
+//                        getFileManager().deleteFile(chunk.getChunkFile());
+//                    }
+//                }
+//                if (deleteFile) getFileManager().deleteFile(task.getFilePath());
+//            }
+//        });
+//        return cancelledTask;
+//    }
 
-        mModeratorExecutor.execute(new Runnable() {
-            @Override
-            public void run() {
-                List<Chunk> chunksOfTask = getTaskManager().getChunksOfTask(task);
-                for (Chunk chunk : chunksOfTask) {
-                    ChunkWorker worker = (ChunkWorker) mWorkers.remove(CHUNK_KEY_PREFIX + chunk.getId());
-                    if (worker != null) {
-                        worker.interrupt();
-                        try {
-                            worker.join();
-                        } catch (InterruptedException ignore) {
-                        }
-                        getFileManager().deleteFile(chunk.getChunkFile());
-                    }
+    private void stopAllWorkerOfTaskSync(Task task) {
+        List<Chunk> chunksOfTask = getTaskManager().getChunksOfTask(task);
+        for (Chunk chunk : chunksOfTask) {
+            ChunkWorker worker = (ChunkWorker) mWorkers.remove(CHUNK_KEY_PREFIX + chunk.getId());
+            if (worker != null) {
+                worker.interrupt();
+                try {
+                    worker.join();
+                } catch (InterruptedException ignore) {
                 }
-                if (deleteFile) getFileManager().deleteFile(task.getFilePath());
+                getFileManager().deleteFile(chunk.getChunkFile());
             }
-        });
-        return cancelledTask;
+        }
+        MergeFileWorker mergeFileWorker = (MergeFileWorker) mWorkers.remove(MERGE_KEY_PREFIX + task.getId());
+        if (mergeFileWorker != null) {
+            mergeFileWorker.interrupt();
+            try {
+                mergeFileWorker.join();
+            } catch (InterruptedException ignore) {
+            }
+        }
     }
 
     @Override
@@ -453,7 +484,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     }
 
     @Override
-    public void onChunkError(ChunkWorker worker, String reason, Throwable throwable) {
+    public void onChunkError(final ChunkWorker worker, final String reason, Throwable throwable) {
         Log.e(throwable, "Chunk-%d failed: %s", worker.getChunk().getId(), reason);
         // download chunk error ==> the task also error
         synchronized (lock) {
@@ -461,11 +492,21 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                 spawnWorker();
             }
             if (!isReleased()) {
-                Task task = getTaskManager().findTask(worker.getChunk().getTaskId());
-                if (task == null)
-                    throw new TaskNotFoundException("Something went wrong, task was removed while chunks were downloading");
-                cancelTaskInternal(task, reason, true);
-                mEventDispatcher.onTaskFailed(getTaskReport(task));
+                mModeratorExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        Task task = getTaskManager().findTask(worker.getChunk().getTaskId());
+                        if (task != null && task.getState() != Task.State.FAILED) {
+                            stopAllWorkerOfTaskSync(task);
+                            getFileManager().deleteFile(task.getFilePath());
+                            Task failedTask = getTaskManager().updateTask(task.newBuilder()
+                                    .setState(Task.State.FAILED)
+                                    .setMessage(reason).build());
+                            updateTaskReport(failedTask, false);
+                            mEventDispatcher.onTaskFailed(getTaskReport(failedTask));
+                        }
+                    }
+                });
             }
         }
     }
@@ -510,8 +551,8 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     }
 
     @Override
-    public void onMergeFileError(final MergeFileWorker worker, String reason, Throwable error) {
-        Task task = worker.getTask();
+    public void onMergeFileError(final MergeFileWorker worker, final String reason, Throwable error) {
+        final Task task = worker.getTask();
         Log.e(error, "Merge task-%d failed: %s", task.getId(), reason);
         mModeratorExecutor.execute(new Runnable() {
             @Override
@@ -522,8 +563,18 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
         synchronized (lock) {
             if (isRunning()) spawnWorker();
             if (!isReleased()) {
-                cancelTaskInternal(task, reason, true);
-                mEventDispatcher.onTaskFailed(getTaskReport(task));
+                mModeratorExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        stopAllWorkerOfTaskSync(task);
+                        getFileManager().deleteFile(task.getFilePath());
+                        Task failedTask = getTaskManager().updateTask(task.newBuilder()
+                                .setState(Task.State.FAILED)
+                                .setMessage(reason).build());
+                        updateTaskReport(failedTask, false);
+                        mEventDispatcher.onTaskFailed(getTaskReport(failedTask));
+                    }
+                });
             }
         }
     }
@@ -540,8 +591,8 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
     }
 
     @Override
-    public void onCheckSumFailed(final MergeFileWorker worker, String algorithm, String expect, String found) {
-        Task task = worker.getTask();
+    public void onCheckSumFailed(final MergeFileWorker worker, final String algorithm, String expect, String found) {
+        final Task task = worker.getTask();
         Log.e("task-%d onCheckSumFailed (%s) [%s] [%s]", task.getId(), algorithm, expect, found);
         mModeratorExecutor.execute(new Runnable() {
             @Override
@@ -549,12 +600,22 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                 mWorkers.remove(MERGE_KEY_PREFIX + worker.getTask().getId());
             }
         });
-        boolean shouldDeleteFile = onChecksumMismatch(task, algorithm, expect, found);
+        final boolean shouldDeleteFile = onChecksumMismatch(task, algorithm, expect, found);
         synchronized (lock) {
             if (isRunning()) spawnWorker();
             if (!isReleased()) {
-                cancelTaskInternal(task, algorithm + " checksum mismatch", shouldDeleteFile);
-                mEventDispatcher.onTaskFailed(getTaskReport(task));
+                mModeratorExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        stopAllWorkerOfTaskSync(task);
+                        if (shouldDeleteFile) getFileManager().deleteFile(task.getFilePath());
+                        Task failedTask = getTaskManager().updateTask(task.newBuilder()
+                                .setState(Task.State.FAILED)
+                                .setMessage(algorithm + " checksum mismatch").build());
+                        updateTaskReport(failedTask, false);
+                        mEventDispatcher.onTaskFailed(getTaskReport(failedTask));
+                    }
+                });
             }
         }
     }
