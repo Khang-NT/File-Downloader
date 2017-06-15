@@ -88,7 +88,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
             public void run() {
                 Task task = getTaskManager().findTask(taskId);
                 if (task != null && !task.isDone()) {
-                    stopAllWorkerOfTaskSync(task);
+                    cancelAllWorkerOfTaskSync(task);
                     getFileManager().deleteFile(task.getFilePath());
                     Task cancelledTask = getTaskManager().updateTask(task.newBuilder()
                             .setState(Task.State.FAILED)
@@ -446,7 +446,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
 //        return cancelledTask;
 //    }
 
-    private void stopAllWorkerOfTaskSync(Task task) {
+    private void cancelAllWorkerOfTaskSync(Task task) {
         List<Chunk> chunksOfTask = getTaskManager().getChunksOfTask(task);
         for (Chunk chunk : chunksOfTask) {
             ChunkWorker worker = (ChunkWorker) mWorkers.remove(CHUNK_KEY_PREFIX + chunk.getId());
@@ -456,8 +456,8 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                     worker.join();
                 } catch (InterruptedException ignore) {
                 }
-                getFileManager().deleteFile(chunk.getChunkFile());
             }
+            getFileManager().deleteFile(chunk.getChunkFile());
         }
         MergeFileWorker mergeFileWorker = (MergeFileWorker) mWorkers.remove(MERGE_KEY_PREFIX + task.getId());
         if (mergeFileWorker != null) {
@@ -497,7 +497,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                     public void run() {
                         Task task = getTaskManager().findTask(worker.getChunk().getTaskId());
                         if (task != null && task.getState() != Task.State.FAILED) {
-                            stopAllWorkerOfTaskSync(task);
+                            cancelAllWorkerOfTaskSync(task);
                             getFileManager().deleteFile(task.getFilePath());
                             Task failedTask = getTaskManager().updateTask(task.newBuilder()
                                     .setState(Task.State.FAILED)
@@ -566,7 +566,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                 mModeratorExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
-                        stopAllWorkerOfTaskSync(task);
+                        cancelAllWorkerOfTaskSync(task);
                         getFileManager().deleteFile(task.getFilePath());
                         Task failedTask = getTaskManager().updateTask(task.newBuilder()
                                 .setState(Task.State.FAILED)
@@ -607,7 +607,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
                 mModeratorExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
-                        stopAllWorkerOfTaskSync(task);
+                        cancelAllWorkerOfTaskSync(task);
                         if (shouldDeleteFile) getFileManager().deleteFile(task.getFilePath());
                         Task failedTask = getTaskManager().updateTask(task.newBuilder()
                                 .setState(Task.State.FAILED)
