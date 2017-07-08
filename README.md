@@ -14,14 +14,14 @@ Install via Maven:
 <dependency>
   <groupId>com.github.khangnt</groupId>
   <artifactId>file-downloader</artifactId>
-  <version>0.0.8</version>
+  <version>0.1</version>
   <type>pom</type>
 </dependency>
 ```
 
 Or Gradle:
 ```
-compile 'com.github.khangnt:file-downloader:0.0.8'
+compile 'com.github.khangnt:file-downloader:0.1'
 ```
 
 # Overview
