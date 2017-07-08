@@ -1,6 +1,7 @@
 package io.github.khangnt.downloader;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Executor;
 
@@ -23,7 +24,13 @@ class EventDispatcher implements EventListener {
 
     public void unregisterListener(EventListener listener) {
         synchronized (mListenerList) {
-            mListenerList.remove(listener);
+            Iterator<ListenerWrapper> iterator = mListenerList.iterator();
+            while (iterator.hasNext()) {
+                ListenerWrapper listenerWrapper = iterator.next();
+                if (listenerWrapper.mListener == listener) {
+                    iterator.remove();
+                }
+            }
         }
     }
 
@@ -139,11 +146,6 @@ class EventDispatcher implements EventListener {
         public ListenerWrapper(Executor mExecutor, EventListener mListener) {
             this.mExecutor = mExecutor;
             this.mListener = mListener;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            return mListener == o;
         }
     }
 }
