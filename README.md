@@ -29,5 +29,8 @@ compile 'com.github.khangnt:file-downloader:0.0.8'
 # Updates
 See [CHANGELOG](CHANGELOG.md).
 
+# Credits
+This library has inspiration from [`majidgolshadi/Android-Download-Manager-Pro`](https://github.com/majidgolshadi/Android-Download-Manager-Pro)
+
 # License
 File Downloader is licensed under an [Apache 2.0 license](LICENSE).
