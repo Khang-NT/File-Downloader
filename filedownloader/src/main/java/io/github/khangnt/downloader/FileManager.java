@@ -17,5 +17,5 @@ public interface FileManager {
     boolean isFileExists(String filePath);
     long getFileSize(String filePath);
     void deleteFile(String filePath);
-    String getUniqueTempFile(Task task);
+    String getUniqueTempFile(Task task) throws Exception;
 }

@@ -303,7 +303,7 @@ public class FileDownloader implements IFileDownloader, ChunkWorkerListener, Mer
         });
     }
 
-    protected Task initTask(Task task) {
+    protected Task initTask(Task task) throws Exception {
         Log.d("Initializing task-%d...", task.getId());
         mTaskManager.removeChunksOfTask(task);
         Task.Builder after = task.newBuilder();

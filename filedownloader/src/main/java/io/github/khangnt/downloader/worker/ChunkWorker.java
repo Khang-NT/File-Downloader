@@ -82,13 +82,17 @@ public class ChunkWorker extends Thread implements ChunkWorkerListener {
             Log.d("Chunk length: %d, remaining bytes: %d", mChunk.getLength(), remainingBytes);
             if (remainingBytes >= C.MIN_CHUNK_LENGTH * 4) {
                 long splitPoint = mChunk.getEnd() - remainingBytes / 2;
-                Chunk.Builder newChunkBuilder = new Chunk.Builder(mChunk.getTaskId(),
-                        mFileManager.getUniqueTempFile(task))
-                        .setRange(splitPoint + 1, mChunk.getEnd());
-                Chunk newChunk = mTaskManager.insertChunk(newChunkBuilder.build());
-                mChunk = mTaskManager.updateChunk(mChunk.newBuilder()
-                        .setRange(mChunk.getBegin(), splitPoint).build());
-                return newChunk;
+                try {
+                    Chunk.Builder newChunkBuilder = new Chunk.Builder(mChunk.getTaskId(),
+                            mFileManager.getUniqueTempFile(task))
+                            .setRange(splitPoint + 1, mChunk.getEnd());
+                    Chunk newChunk = mTaskManager.insertChunk(newChunkBuilder.build());
+                    mChunk = mTaskManager.updateChunk(mChunk.newBuilder()
+                            .setRange(mChunk.getBegin(), splitPoint).build());
+                    return newChunk;
+                } catch (Exception ex) {
+                    Log.d(ex, "Split chunk error");
+                }
             }
             return null;
         }
