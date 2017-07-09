@@ -19,7 +19,7 @@ sourceCompatibility = "1.7"
 targetCompatibility = "1.7"
 
 group = 'com.github.khangnt'
-version = '0.1'
+version = '0.1.1'
 
 def pomConfig = {
     licenses {
@@ -50,7 +50,7 @@ publishing {
             artifact javaDocJar
             groupId group
             artifactId 'file-downloader'
-            version '0.1'
+            version '0.1.1'
             pom.withXml {
                 def root = asNode()
                 root.appendNode('description', 'A File-Downloader library for Android and Java applications.')
@@ -84,8 +84,8 @@ bintray {
         licenses = ['Apache-2.0']
         vcsUrl = 'https://github.com/Khang-NT/File-Downloader.git'
         version {
-            name = "v0.1"
-            vcsTag = "release-v0.1"
+            name = "v0.1.1"
+            vcsTag = "release-v0.1.1"
             released  = new Date()
         }
     }
