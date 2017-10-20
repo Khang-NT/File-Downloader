@@ -1,5 +1,6 @@
 package io.github.khangnt.downloader;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -27,7 +28,8 @@ class EventDispatcher implements EventListener {
             Iterator<ListenerWrapper> iterator = mListenerList.iterator();
             while (iterator.hasNext()) {
                 ListenerWrapper listenerWrapper = iterator.next();
-                if (listenerWrapper.mListener == listener) {
+                if (listenerWrapper.mWeakRefListener.get() == listener
+                        || listenerWrapper.mWeakRefListener.get() == null) {
                     iterator.remove();
                 }
             }
@@ -48,7 +50,10 @@ class EventDispatcher implements EventListener {
                 listenerWrapper.mExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
-                        listenerWrapper.mListener.onTaskAdded(taskReport);
+                        EventListener listener = listenerWrapper.mWeakRefListener.get();
+                        if (listener != null) {
+                            listener.onTaskAdded(taskReport);
+                        }
                     }
                 });
             }
@@ -62,7 +67,10 @@ class EventDispatcher implements EventListener {
                 listenerWrapper.mExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
-                        listenerWrapper.mListener.onTaskUpdated(taskReport);
+                        EventListener listener = listenerWrapper.mWeakRefListener.get();
+                        if (listener != null) {
+                            listener.onTaskUpdated(taskReport);
+                        }
                     }
                 });
             }
@@ -76,7 +84,10 @@ class EventDispatcher implements EventListener {
                 listenerWrapper.mExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
-                        listenerWrapper.mListener.onTaskCancelled(taskReport);
+                        EventListener listener = listenerWrapper.mWeakRefListener.get();
+                        if (listener != null) {
+                            listener.onTaskCancelled(taskReport);
+                        }
                     }
                 });
             }
@@ -90,7 +101,10 @@ class EventDispatcher implements EventListener {
                 listenerWrapper.mExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
-                        listenerWrapper.mListener.onTaskFinished(taskReport);
+                        EventListener listener = listenerWrapper.mWeakRefListener.get();
+                        if (listener != null) {
+                            listener.onTaskFinished(taskReport);
+                        }
                     }
                 });
             }
@@ -104,7 +118,10 @@ class EventDispatcher implements EventListener {
                 listenerWrapper.mExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
-                        listenerWrapper.mListener.onTaskFailed(taskReport);
+                        EventListener listener = listenerWrapper.mWeakRefListener.get();
+                        if (listener != null) {
+                            listener.onTaskFailed(taskReport);
+                        }
                     }
                 });
             }
@@ -118,7 +135,10 @@ class EventDispatcher implements EventListener {
                 listenerWrapper.mExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
-                        listenerWrapper.mListener.onResumed();
+                        EventListener listener = listenerWrapper.mWeakRefListener.get();
+                        if (listener != null) {
+                            listener.onResumed();
+                        }
                     }
                 });
             }
@@ -132,7 +152,10 @@ class EventDispatcher implements EventListener {
                 listenerWrapper.mExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
-                        listenerWrapper.mListener.onPaused();
+                        EventListener listener = listenerWrapper.mWeakRefListener.get();
+                        if (listener != null) {
+                            listener.onPaused();
+                        }
                     }
                 });
             }
@@ -141,11 +164,11 @@ class EventDispatcher implements EventListener {
 
     private class ListenerWrapper {
         private Executor mExecutor;
-        private EventListener mListener;
+        private WeakReference<EventListener> mWeakRefListener;
 
-        public ListenerWrapper(Executor mExecutor, EventListener mListener) {
+        public ListenerWrapper(Executor mExecutor, EventListener listener) {
             this.mExecutor = mExecutor;
-            this.mListener = mListener;
+            this.mWeakRefListener = new WeakReference<>(listener);
         }
     }
 }
