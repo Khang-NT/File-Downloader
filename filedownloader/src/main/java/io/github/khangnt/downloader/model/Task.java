@@ -20,7 +20,6 @@ public class Task {
         FINISHED;
     }
 
-
     private int mId = UNSET;
     private String mUrl;
     private String mFilePath;
